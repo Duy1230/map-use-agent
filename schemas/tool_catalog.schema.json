@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "ToolDefinition": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/ToolParameter"
+          },
+          "title": "Parameters",
+          "type": "array"
+        },
+        "return_schema": {
+          "title": "Return Schema",
+          "type": "object"
+        },
+        "side_effects": {
+          "default": false,
+          "title": "Side Effects",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "category"
+      ],
+      "title": "ToolDefinition",
+      "type": "object"
+    },
+    "ToolParameter": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "default": {
+          "default": null,
+          "title": "Default"
+        },
+        "enum": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enum"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ToolParameter",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "$ref": "#/$defs/ToolDefinition"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "tools"
+  ],
+  "title": "ToolCatalog",
+  "type": "object"
+}

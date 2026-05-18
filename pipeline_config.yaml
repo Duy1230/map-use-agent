@@ -1,0 +1,37 @@
+llm:
+  backend: "vllm"                                  # vllm | llamacpp | api
+  base_url: "http://localhost:8000/v1"
+  model: "meta-llama/Llama-3.1-70B-Instruct"
+  api_key: "EMPTY"
+  timeout: 120.0
+
+worlds:
+  count: 100
+  base_seed: 42
+  small_fraction: 0.30
+  medium_fraction: 0.50
+  trajectory_duration_min: 30
+
+generation:
+  blueprints_per_scenario: 10
+  utterances_per_blueprint: 6
+  llm_adversarial_per_scenario: 3
+  temperature_blueprint: 0.8
+  temperature_utterance: 0.9
+  temperature_verifier: 0.2
+
+targets:
+  L0: 150
+  L1: 150
+  L2: 250
+  L3: 200
+  L4: 150
+  L5: 100
+
+verification:
+  run_semantic_verifier: true
+  human_review_rate: 0.10
+
+scenarios_dir: "scenarios"
+datasets_dir: "datasets"
+reports_dir: "reports"

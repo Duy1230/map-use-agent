@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "map-use-agent"
+version = "0.1.0"
+description = "Synthetic data generation pipeline for State-Aware Map Tool-Use Agent"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "openai>=1.30",
+    "pydantic>=2.7",
+    "jsonschema>=4.22",
+    "shapely>=2.0",
+    "geojson>=3.1",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "tqdm>=4.66",
+    "xxhash>=3.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[project.scripts]
+map-pipeline = "src.pipeline.runner:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "DrawnArtifact": {
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_type": {
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Geometry"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "artifact_type"
+      ],
+      "title": "DrawnArtifact",
+      "type": "object"
+    },
+    "SelectedEntity": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "SelectedEntity",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "time": {
+      "title": "Time",
+      "type": "string"
+    },
+    "selected": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SelectedEntity"
+          },
+          {
+            "items": {
+              "$ref": "#/$defs/SelectedEntity"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Selected",
+      "type": "object"
+    },
+    "active_layers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Layers",
+      "type": "array"
+    },
+    "drawn_artifacts": {
+      "items": {
+        "$ref": "#/$defs/DrawnArtifact"
+      },
+      "title": "Drawn Artifacts",
+      "type": "array"
+    },
+    "highlighted_objects": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Highlighted Objects",
+      "type": "array"
+    },
+    "popups": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Popups",
+      "type": "array"
+    }
+  },
+  "required": [
+    "time"
+  ],
+  "title": "MapState",
+  "type": "object"
+}

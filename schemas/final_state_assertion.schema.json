@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "AssertionType": {
+      "enum": [
+        "artifact_exists",
+        "object_highlighted",
+        "objects_highlighted",
+        "popup_shown",
+        "artifact_removed",
+        "polyline_source_matches_vehicle",
+        "objects_inside_polygon_highlighted",
+        "no_tool_called",
+        "clarification_requested"
+      ],
+      "title": "AssertionType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "type": {
+      "$ref": "#/$defs/AssertionType"
+    },
+    "artifact_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifact Type"
+    },
+    "source_object_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Object Id"
+    },
+    "object_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Object Id"
+    },
+    "object_ids": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Object Ids"
+    },
+    "object_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Object Type"
+    },
+    "target_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Id"
+    },
+    "time_range": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Time Range"
+    },
+    "extra": {
+      "title": "Extra",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type"
+  ],
+  "title": "FinalStateAssertion",
+  "type": "object"
+}

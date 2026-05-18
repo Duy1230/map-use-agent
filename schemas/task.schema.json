@@ -1,0 +1,446 @@
+{
+  "$defs": {
+    "AssertionType": {
+      "enum": [
+        "artifact_exists",
+        "object_highlighted",
+        "objects_highlighted",
+        "popup_shown",
+        "artifact_removed",
+        "polyline_source_matches_vehicle",
+        "objects_inside_polygon_highlighted",
+        "no_tool_called",
+        "clarification_requested"
+      ],
+      "title": "AssertionType",
+      "type": "string"
+    },
+    "Difficulty": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L5"
+      ],
+      "title": "Difficulty",
+      "type": "string"
+    },
+    "DrawnArtifact": {
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_type": {
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Geometry"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "artifact_type"
+      ],
+      "title": "DrawnArtifact",
+      "type": "object"
+    },
+    "Expected": {
+      "properties": {
+        "required_semantic_steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Semantic Steps",
+          "type": "array"
+        },
+        "allowed_extra_tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Extra Tools",
+          "type": "array"
+        },
+        "forbidden_tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Tools",
+          "type": "array"
+        },
+        "final_state_assertions": {
+          "items": {
+            "$ref": "#/$defs/FinalStateAssertion"
+          },
+          "title": "Final State Assertions",
+          "type": "array"
+        },
+        "should_ask_clarification": {
+          "default": false,
+          "title": "Should Ask Clarification",
+          "type": "boolean"
+        }
+      },
+      "title": "Expected",
+      "type": "object"
+    },
+    "FinalStateAssertion": {
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/AssertionType"
+        },
+        "artifact_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Type"
+        },
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Id"
+        },
+        "object_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Ids"
+        },
+        "object_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Type"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Id"
+        },
+        "time_range": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Time Range"
+        },
+        "extra": {
+          "title": "Extra",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "FinalStateAssertion",
+      "type": "object"
+    },
+    "GenerationMetadata": {
+      "properties": {
+        "generator_model": {
+          "default": "",
+          "title": "Generator Model",
+          "type": "string"
+        },
+        "blueprint_id": {
+          "default": "",
+          "title": "Blueprint Id",
+          "type": "string"
+        },
+        "verified_by_schema": {
+          "default": false,
+          "title": "Verified By Schema",
+          "type": "boolean"
+        },
+        "verified_by_execution": {
+          "default": false,
+          "title": "Verified By Execution",
+          "type": "boolean"
+        },
+        "verified_by_llm": {
+          "default": false,
+          "title": "Verified By Llm",
+          "type": "boolean"
+        },
+        "human_reviewed": {
+          "default": false,
+          "title": "Human Reviewed",
+          "type": "boolean"
+        }
+      },
+      "title": "GenerationMetadata",
+      "type": "object"
+    },
+    "MapState": {
+      "properties": {
+        "time": {
+          "title": "Time",
+          "type": "string"
+        },
+        "selected": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SelectedEntity"
+              },
+              {
+                "items": {
+                  "$ref": "#/$defs/SelectedEntity"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Selected",
+          "type": "object"
+        },
+        "active_layers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Active Layers",
+          "type": "array"
+        },
+        "drawn_artifacts": {
+          "items": {
+            "$ref": "#/$defs/DrawnArtifact"
+          },
+          "title": "Drawn Artifacts",
+          "type": "array"
+        },
+        "highlighted_objects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Highlighted Objects",
+          "type": "array"
+        },
+        "popups": {
+          "items": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "title": "Popups",
+          "type": "array"
+        }
+      },
+      "required": [
+        "time"
+      ],
+      "title": "MapState",
+      "type": "object"
+    },
+    "SelectedEntity": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "SelectedEntity",
+      "type": "object"
+    },
+    "ToolCall": {
+      "properties": {
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "args": {
+          "title": "Args",
+          "type": "object"
+        }
+      },
+      "required": [
+        "tool"
+      ],
+      "title": "ToolCall",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "tool_catalog_version": {
+      "default": "map_tools_v0.1",
+      "title": "Tool Catalog Version",
+      "type": "string"
+    },
+    "language": {
+      "default": "vi",
+      "title": "Language",
+      "type": "string"
+    },
+    "difficulty": {
+      "$ref": "#/$defs/Difficulty"
+    },
+    "task_type": {
+      "title": "Task Type",
+      "type": "string"
+    },
+    "user_request": {
+      "title": "User Request",
+      "type": "string"
+    },
+    "initial_state": {
+      "$ref": "#/$defs/MapState"
+    },
+    "available_tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Available Tools",
+      "type": "array"
+    },
+    "gold_trace": {
+      "items": {
+        "$ref": "#/$defs/ToolCall"
+      },
+      "title": "Gold Trace",
+      "type": "array"
+    },
+    "expected": {
+      "$ref": "#/$defs/Expected"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "generation_metadata": {
+      "$ref": "#/$defs/GenerationMetadata"
+    }
+  },
+  "required": [
+    "id",
+    "scenario_id",
+    "difficulty",
+    "task_type",
+    "user_request",
+    "initial_state",
+    "expected"
+  ],
+  "title": "TaskSample",
+  "type": "object"
+}

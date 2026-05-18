@@ -1,0 +1,267 @@
+{
+  "$defs": {
+    "GeoJSONLineString": {
+      "properties": {
+        "type": {
+          "default": "LineString",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "GeoJSONLineString",
+      "type": "object"
+    },
+    "GeoJSONPoint": {
+      "properties": {
+        "type": {
+          "default": "Point",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 2,
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "GeoJSONPoint",
+      "type": "object"
+    },
+    "GeoJSONPolygon": {
+      "properties": {
+        "type": {
+          "default": "Polygon",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "GeoJSONPolygon",
+      "type": "object"
+    },
+    "MapObject": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GeoJSONPoint"
+            },
+            {
+              "$ref": "#/$defs/GeoJSONPolygon"
+            },
+            {
+              "$ref": "#/$defs/GeoJSONLineString"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "properties": {
+          "$ref": "#/$defs/ObjectProperties"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "name",
+        "geometry"
+      ],
+      "title": "MapObject",
+      "type": "object"
+    },
+    "ObjectProperties": {
+      "properties": {
+        "speed_kmh": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speed Kmh"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "heading_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading Deg"
+        },
+        "extra": {
+          "title": "Extra",
+          "type": "object"
+        }
+      },
+      "title": "ObjectProperties",
+      "type": "object"
+    },
+    "ScenarioObjects": {
+      "properties": {
+        "vehicles": {
+          "items": {
+            "$ref": "#/$defs/MapObject"
+          },
+          "title": "Vehicles",
+          "type": "array"
+        },
+        "cameras": {
+          "items": {
+            "$ref": "#/$defs/MapObject"
+          },
+          "title": "Cameras",
+          "type": "array"
+        },
+        "polygons": {
+          "items": {
+            "$ref": "#/$defs/MapObject"
+          },
+          "title": "Polygons",
+          "type": "array"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/MapObject"
+          },
+          "title": "Lines",
+          "type": "array"
+        }
+      },
+      "title": "ScenarioObjects",
+      "type": "object"
+    },
+    "TrajectoryPoint": {
+      "properties": {
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 2,
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "timestamp",
+        "coordinates"
+      ],
+      "title": "TrajectoryPoint",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "coordinate_system": {
+      "default": "EPSG:4326",
+      "title": "Coordinate System",
+      "type": "string"
+    },
+    "time": {
+      "title": "Time",
+      "type": "string"
+    },
+    "objects": {
+      "$ref": "#/$defs/ScenarioObjects"
+    },
+    "time_series": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "items": {
+            "$ref": "#/$defs/TrajectoryPoint"
+          },
+          "type": "array"
+        },
+        "type": "object"
+      },
+      "title": "Time Series",
+      "type": "object"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "time",
+    "objects"
+  ],
+  "title": "Scenario",
+  "type": "object"
+}

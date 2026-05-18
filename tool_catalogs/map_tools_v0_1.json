@@ -1,0 +1,422 @@
+{
+  "version": "map_tools_v0.1",
+  "tools": [
+    {
+      "name": "get_current_map_state",
+      "description": "Return the current visible map state including selected entities, active layers, and drawn artifacts.",
+      "category": "state",
+      "parameters": [],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "time": {"type": "string"},
+          "selected": {"type": "object"},
+          "active_layers": {"type": "array", "items": {"type": "string"}},
+          "drawn_artifacts": {"type": "array"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_selected_entity",
+      "description": "Return the currently selected entity of a given type (object, line, polygon). Returns null if nothing is selected.",
+      "category": "state",
+      "parameters": [
+        {
+          "name": "entity_type",
+          "type": "string",
+          "description": "Type of selection slot to query: 'object', 'line', or 'polygon'. If omitted, returns all selection slots.",
+          "required": false,
+          "default": null,
+          "enum": ["object", "line", "polygon"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "oneOf": [
+              {"type": "object", "properties": {"id": {"type": "string"}, "type": {"type": "string"}, "name": {"type": "string"}}},
+              {"type": "null"}
+            ]
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "resolve_entity",
+      "description": "Resolve a natural-language or alias reference to a concrete map entity. Searches by ID, name, and aliases.",
+      "category": "state",
+      "parameters": [
+        {
+          "name": "reference",
+          "type": "string",
+          "description": "The reference string to resolve (e.g. 'xe 102', 'camera số 3', 'zone_07').",
+          "required": true
+        },
+        {
+          "name": "expected_type",
+          "type": "string",
+          "description": "Limit the search to a specific object type.",
+          "required": false,
+          "default": null,
+          "enum": ["vehicle", "camera", "polygon", "line"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "entity": {"type": "object"},
+          "confidence": {"type": "number"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_object_info",
+      "description": "Return detailed information about a map object by its ID.",
+      "category": "object",
+      "parameters": [
+        {
+          "name": "object_id",
+          "type": "string",
+          "description": "The unique identifier of the object.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "type": {"type": "string"},
+          "name": {"type": "string"},
+          "geometry": {"type": "object"},
+          "properties": {"type": "object"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_vehicle_trajectory",
+      "description": "Return the trajectory (list of timestamped positions) for a vehicle within a time range.",
+      "category": "object",
+      "parameters": [
+        {
+          "name": "vehicle_id",
+          "type": "string",
+          "description": "The vehicle ID.",
+          "required": true
+        },
+        {
+          "name": "time_range",
+          "type": "string",
+          "description": "Time window for the trajectory.",
+          "required": true,
+          "enum": ["last_5_minutes", "last_10_minutes", "last_30_minutes", "last_1_hour", "today"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": {"type": "string"},
+          "points": {"type": "array", "items": {"type": "object"}},
+          "time_range": {"type": "string"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_nearby_objects",
+      "description": "Find objects of a given type within a radius of another object.",
+      "category": "object",
+      "parameters": [
+        {
+          "name": "object_id",
+          "type": "string",
+          "description": "The center object ID.",
+          "required": true
+        },
+        {
+          "name": "object_type",
+          "type": "string",
+          "description": "Type of objects to search for.",
+          "required": true,
+          "enum": ["vehicle", "camera", "polygon", "line"]
+        },
+        {
+          "name": "radius_meters",
+          "type": "number",
+          "description": "Search radius in meters.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "center_object_id": {"type": "string"},
+          "results": {"type": "array", "items": {"type": "object"}},
+          "radius_meters": {"type": "number"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_polygon_area",
+      "description": "Calculate the area (in square meters) of a polygon.",
+      "category": "polygon",
+      "parameters": [
+        {
+          "name": "polygon_id",
+          "type": "string",
+          "description": "The polygon ID.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "polygon_id": {"type": "string"},
+          "area_sqm": {"type": "number"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_line_length",
+      "description": "Calculate the length (in meters) of a line.",
+      "category": "polygon",
+      "parameters": [
+        {
+          "name": "line_id",
+          "type": "string",
+          "description": "The line ID.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "line_id": {"type": "string"},
+          "length_meters": {"type": "number"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_objects_inside_polygon",
+      "description": "Return all objects of a given type that are inside a polygon.",
+      "category": "polygon",
+      "parameters": [
+        {
+          "name": "polygon_id",
+          "type": "string",
+          "description": "The polygon ID.",
+          "required": true
+        },
+        {
+          "name": "object_type",
+          "type": "string",
+          "description": "Type of objects to search.",
+          "required": true,
+          "enum": ["vehicle", "camera"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "polygon_id": {"type": "string"},
+          "results": {"type": "array", "items": {"type": "object"}}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "get_objects_crossing_line",
+      "description": "Return all objects of a given type whose trajectory crosses a line within a time range.",
+      "category": "polygon",
+      "parameters": [
+        {
+          "name": "line_id",
+          "type": "string",
+          "description": "The line ID.",
+          "required": true
+        },
+        {
+          "name": "object_type",
+          "type": "string",
+          "description": "Type of objects to check.",
+          "required": true,
+          "enum": ["vehicle"]
+        },
+        {
+          "name": "time_range",
+          "type": "string",
+          "description": "Time window for crossing detection.",
+          "required": true,
+          "enum": ["last_5_minutes", "last_10_minutes", "last_30_minutes", "last_1_hour", "today"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "line_id": {"type": "string"},
+          "results": {"type": "array", "items": {"type": "object"}}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "highlight_objects",
+      "description": "Highlight one or more objects on the map.",
+      "category": "action",
+      "parameters": [
+        {
+          "name": "object_ids",
+          "type": "array",
+          "description": "List of object IDs to highlight.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "highlighted": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "side_effects": true
+    },
+    {
+      "name": "draw_polyline",
+      "description": "Draw a polyline on the map.",
+      "category": "action",
+      "parameters": [
+        {
+          "name": "points",
+          "type": "array",
+          "description": "Array of [longitude, latitude] coordinate pairs.",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Label for the polyline.",
+          "required": true
+        },
+        {
+          "name": "source_object_id",
+          "type": "string",
+          "description": "Optional ID of the source object this polyline relates to.",
+          "required": false,
+          "default": null
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    },
+    {
+      "name": "draw_polygon",
+      "description": "Draw a polygon on the map.",
+      "category": "action",
+      "parameters": [
+        {
+          "name": "geometry",
+          "type": "object",
+          "description": "GeoJSON Polygon geometry.",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Label for the polygon.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    },
+    {
+      "name": "draw_marker",
+      "description": "Draw a marker at given coordinates.",
+      "category": "action",
+      "parameters": [
+        {
+          "name": "coordinates",
+          "type": "array",
+          "description": "[longitude, latitude] for the marker.",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Label for the marker.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    },
+    {
+      "name": "show_popup",
+      "description": "Show a popup attached to a map object.",
+      "category": "action",
+      "parameters": [
+        {
+          "name": "target_id",
+          "type": "string",
+          "description": "The ID of the object to attach the popup to.",
+          "required": true
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "description": "HTML or text content for the popup.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "popup_id": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    },
+    {
+      "name": "clear_artifacts",
+      "description": "Remove drawn artifacts from the map.",
+      "category": "action",
+      "parameters": [
+        {
+          "name": "scope",
+          "type": "string",
+          "description": "What to clear.",
+          "required": true,
+          "enum": ["all", "polylines", "polygons", "markers", "popups", "highlights"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "cleared": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    }
+  ]
+}
