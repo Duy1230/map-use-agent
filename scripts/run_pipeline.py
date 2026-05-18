@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """CLI entry-point for the synthetic data generation pipeline."""
 
-import json
 import logging
 import sys
 from pathlib import Path
@@ -14,9 +13,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from src.pipeline.config import PipelineConfig
-from src.pipeline.runner import run_pipeline
-from src.world_generator.generator import generate_worlds
+from src.pipeline.config import PipelineConfig  # noqa: E402
+from src.pipeline.runner import run_pipeline  # noqa: E402
+from src.world_generator.generator import generate_worlds  # noqa: E402
 
 app = typer.Typer(help="Map Agent synthetic data pipeline")
 
@@ -28,15 +27,26 @@ logging.basicConfig(
 
 @app.command()
 def main(
-    config: str = typer.Option("pipeline_config.yaml", "--config", "-c", help="Path to YAML config"),
+    config: str = typer.Option(
+        "pipeline_config.yaml", "--config", "-c", help="Path to YAML config"
+    ),
     backend: Optional[str] = typer.Option(None, "--backend", "-b", help="LLM backend override"),
     base_url: Optional[str] = typer.Option(None, "--base-url", help="LLM base URL override"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model override"),
     api_key: Optional[str] = typer.Option(None, "--api-key", help="LLM API key override"),
-    num_worlds: Optional[int] = typer.Option(None, "--num-worlds", help="Number of worlds to generate"),
-    target_samples: Optional[int] = typer.Option(None, "--target-samples", help="Overall target sample count"),
-    stage: Optional[str] = typer.Option(None, "--stage", "-s", help="Run only a specific stage: worlds, full"),
-    output_dir: Optional[str] = typer.Option(None, "--output-dir", "-o", help="Output directory for datasets"),
+    num_worlds: Optional[int] = typer.Option(
+        None, "--num-worlds", help="Number of worlds to generate"
+    ),
+    target_samples: Optional[int] = typer.Option(
+        None, "--target-samples", help="Overall target sample count"
+    ),
+    stage: Optional[str] = typer.Option(
+        None, "--stage", "-s", help="Run only a specific stage: worlds, full"
+    ),
+    output_dir: Optional[str] = typer.Option(
+        None, "--output-dir", "-o", help="Output directory for datasets"
+    ),
+    profile: Optional[str] = typer.Option(None, "--profile", help="Domain profile YAML override"),
 ) -> None:
     """Run the synthetic data generation pipeline."""
     cfg_path = Path(config)
@@ -58,6 +68,8 @@ def main(
         cfg.worlds.count = num_worlds
     if output_dir:
         cfg.datasets_dir = output_dir
+    if profile:
+        cfg.profile = profile
 
     if stage == "worlds":
         typer.echo(f"Generating {cfg.worlds.count} worlds...")

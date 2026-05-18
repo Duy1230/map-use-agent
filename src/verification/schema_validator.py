@@ -28,8 +28,12 @@ def validate_schema(sample: dict) -> tuple[bool, list[str]]:
     Returns (passed, list_of_error_messages).
     """
     required_fields = [
-        "id", "scenario_id", "task_type", "user_request",
-        "initial_state", "expected",
+        "id",
+        "scenario_id",
+        "task_type",
+        "user_request",
+        "initial_state",
+        "expected",
     ]
     errors: list[str] = []
 

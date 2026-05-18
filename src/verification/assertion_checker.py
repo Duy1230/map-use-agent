@@ -4,7 +4,21 @@ from __future__ import annotations
 
 import logging
 
+from src.pipeline.context import PipelineContext
+
 logger = logging.getLogger(__name__)
+
+DEFAULT_ASSERTIONS = {
+    "artifact_exists",
+    "object_highlighted",
+    "objects_highlighted",
+    "popup_shown",
+    "artifact_removed",
+    "polyline_source_matches_vehicle",
+    "objects_inside_polygon_highlighted",
+    "clarification_requested",
+    "no_tool_called",
+}
 
 
 def check_assertions(
@@ -12,6 +26,7 @@ def check_assertions(
     assertions: list[dict],
     *,
     is_negative: bool = False,
+    context: PipelineContext | None = None,
 ) -> tuple[bool, list[str]]:
     """Verify final_state satisfies the expected assertions.
 
@@ -31,9 +46,13 @@ def check_assertions(
         return (True, [])
 
     errors: list[str] = []
+    allowed_assertions = context.profile.assertions if context else DEFAULT_ASSERTIONS
 
     for i, assertion in enumerate(assertions):
         atype = assertion.get("type", "")
+        if atype not in allowed_assertions:
+            errors.append(f"Unknown assertion type: {atype}")
+            continue
         ok = _check_single(final_state, assertion, atype)
         if not ok:
             errors.append(f"Assertion[{i}] failed: {assertion}")
@@ -63,9 +82,7 @@ def _check_single(state: dict, assertion: dict, atype: str) -> bool:
 
     if atype == "popup_shown":
         target_id = assertion.get("target_id")
-        return any(
-            p.get("target_id") == target_id for p in state.get("popups", [])
-        )
+        return any(p.get("target_id") == target_id for p in state.get("popups", []))
 
     if atype == "artifact_removed":
         return not _has_artifact(

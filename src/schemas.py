@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 # Geometry
 # ---------------------------------------------------------------------------
 
+
 class GeoJSONPoint(BaseModel):
     type: str = "Point"
     coordinates: list[float] = Field(..., min_length=2, max_length=3)
@@ -36,6 +37,7 @@ Geometry = GeoJSONPoint | GeoJSONLineString | GeoJSONPolygon
 # ---------------------------------------------------------------------------
 # Scenario / World objects
 # ---------------------------------------------------------------------------
+
 
 class ObjectProperties(BaseModel):
     speed_kmh: float | None = None
@@ -70,12 +72,14 @@ class Scenario(BaseModel):
     coordinate_system: str = "EPSG:4326"
     time: str
     objects: ScenarioObjects
+    objects_by_type: dict[str, list[MapObject]] = Field(default_factory=dict)
     time_series: dict[str, dict[str, list[TrajectoryPoint]]] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
 # Map State (what the agent sees)
 # ---------------------------------------------------------------------------
+
 
 class SelectedEntity(BaseModel):
     id: str
@@ -106,6 +110,7 @@ class MapState(BaseModel):
 # Tool Catalog
 # ---------------------------------------------------------------------------
 
+
 class ToolParameter(BaseModel):
     name: str
     type: str
@@ -133,6 +138,7 @@ class ToolCatalog(BaseModel):
 # Tool Call / Gold Trace
 # ---------------------------------------------------------------------------
 
+
 class ToolCall(BaseModel):
     tool: str
     args: dict[str, Any] = Field(default_factory=dict)
@@ -141,6 +147,7 @@ class ToolCall(BaseModel):
 # ---------------------------------------------------------------------------
 # Blueprint
 # ---------------------------------------------------------------------------
+
 
 class Difficulty(str, Enum):
     L0 = "L0"
@@ -172,6 +179,7 @@ class Blueprint(BaseModel):
 # Final State Assertions
 # ---------------------------------------------------------------------------
 
+
 class AssertionType(str, Enum):
     artifact_exists = "artifact_exists"
     object_highlighted = "object_highlighted"
@@ -185,7 +193,7 @@ class AssertionType(str, Enum):
 
 
 class FinalStateAssertion(BaseModel):
-    type: AssertionType
+    type: str
     artifact_type: str | None = None
     source_object_id: str | None = None
     object_id: str | None = None
@@ -200,6 +208,7 @@ class FinalStateAssertion(BaseModel):
 # Expected behavior
 # ---------------------------------------------------------------------------
 
+
 class Expected(BaseModel):
     required_semantic_steps: list[str] = Field(default_factory=list)
     allowed_extra_tools: list[str] = Field(default_factory=list)
@@ -211,6 +220,7 @@ class Expected(BaseModel):
 # ---------------------------------------------------------------------------
 # Generation metadata
 # ---------------------------------------------------------------------------
+
 
 class GenerationMetadata(BaseModel):
     generator_model: str = ""
@@ -224,6 +234,7 @@ class GenerationMetadata(BaseModel):
 # ---------------------------------------------------------------------------
 # Full Task Sample (single-turn)
 # ---------------------------------------------------------------------------
+
 
 class TaskSample(BaseModel):
     id: str
@@ -244,6 +255,7 @@ class TaskSample(BaseModel):
 # ---------------------------------------------------------------------------
 # Multi-turn sample
 # ---------------------------------------------------------------------------
+
 
 class TurnSample(BaseModel):
     user: str

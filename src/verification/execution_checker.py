@@ -6,12 +6,16 @@ import logging
 
 from src.mock_environment.environment import MockMapEnvironment
 from src.mock_environment.tools import ToolExecutionError
+from src.pipeline.context import PipelineContext
 
 logger = logging.getLogger(__name__)
 
 
 def check_execution(
-    sample: dict, scenario: dict
+    sample: dict,
+    scenario: dict,
+    *,
+    context: PipelineContext | None = None,
 ) -> tuple[bool, list[str], dict | None]:
     """Run the gold trace in the mock environment.
 
@@ -30,7 +34,7 @@ def check_execution(
     initial_state = sample.get("initial_state")
 
     try:
-        env = MockMapEnvironment(scenario, initial_state)
+        env = MockMapEnvironment(scenario, initial_state, context=context)
     except Exception as exc:
         errors.append(f"Environment init failed: {exc}")
         return (False, errors, None)

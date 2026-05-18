@@ -22,6 +22,7 @@ def _require(args: dict, key: str) -> Any:
 # State tools
 # ---------------------------------------------------------------------------
 
+
 def get_current_map_state(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
     return state.visible_to_agent()
 
@@ -29,19 +30,10 @@ def get_current_map_state(state: MapState, db: ScenarioDatabase, args: dict) -> 
 def get_selected_entity(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
     entity_type = args.get("entity_type")
     if entity_type is None:
-        return {
-            "object": state.selected_object,
-            "line": state.selected_line,
-            "polygon": state.selected_polygon,
-        }
-    mapping = {
-        "object": state.selected_object,
-        "line": state.selected_line,
-        "polygon": state.selected_polygon,
-    }
-    if entity_type not in mapping:
+        return dict(state.selected_entities)
+    if entity_type not in state.selected_entities:
         raise ToolExecutionError(f"Invalid entity_type: {entity_type!r}")
-    return {"entity": mapping[entity_type]}
+    return {"entity": state.selected_entities[entity_type]}
 
 
 def resolve_entity(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
@@ -50,12 +42,16 @@ def resolve_entity(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
     result = db.resolve_reference(reference, expected_type)
     if result is None:
         return {"entity": None, "confidence": 0.0}
-    return {"entity": {"id": result["id"], "type": result["type"], "name": result["name"]}, "confidence": 1.0}
+    return {
+        "entity": {"id": result["id"], "type": result["type"], "name": result["name"]},
+        "confidence": 1.0,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Object tools
 # ---------------------------------------------------------------------------
+
 
 def get_object_info(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
     object_id = _require(args, "object_id")
@@ -89,7 +85,12 @@ def get_nearby_objects(state: MapState, db: ScenarioDatabase, args: dict) -> dic
     return {
         "center_object_id": object_id,
         "results": [
-            {"id": r["id"], "type": r["type"], "name": r["name"], "distance_m": r.get("_distance_m")}
+            {
+                "id": r["id"],
+                "type": r["type"],
+                "name": r["name"],
+                "distance_m": r.get("_distance_m"),
+            }
             for r in results
         ],
         "radius_meters": radius_meters,
@@ -99,6 +100,7 @@ def get_nearby_objects(state: MapState, db: ScenarioDatabase, args: dict) -> dic
 # ---------------------------------------------------------------------------
 # Polygon / line tools
 # ---------------------------------------------------------------------------
+
 
 def get_polygon_area(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
     polygon_id = _require(args, "polygon_id")
@@ -118,10 +120,7 @@ def get_objects_inside_polygon(state: MapState, db: ScenarioDatabase, args: dict
     results = db.get_objects_inside_polygon(polygon_id, object_type)
     return {
         "polygon_id": polygon_id,
-        "results": [
-            {"id": r["id"], "type": r["type"], "name": r["name"]}
-            for r in results
-        ],
+        "results": [{"id": r["id"], "type": r["type"], "name": r["name"]} for r in results],
     }
 
 
@@ -132,16 +131,14 @@ def get_objects_crossing_line(state: MapState, db: ScenarioDatabase, args: dict)
     results = db.get_objects_crossing_line(line_id, object_type, time_range)
     return {
         "line_id": line_id,
-        "results": [
-            {"id": r["id"], "type": r["type"], "name": r["name"]}
-            for r in results
-        ],
+        "results": [{"id": r["id"], "type": r["type"], "name": r["name"]} for r in results],
     }
 
 
 # ---------------------------------------------------------------------------
 # Map action tools
 # ---------------------------------------------------------------------------
+
 
 def highlight_objects(state: MapState, db: ScenarioDatabase, args: dict) -> dict:
     object_ids = _require(args, "object_ids")

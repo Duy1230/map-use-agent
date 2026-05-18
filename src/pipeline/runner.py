@@ -7,7 +7,6 @@ import logging
 import random
 import uuid
 from pathlib import Path
-from typing import Any
 
 from tqdm import tqdm
 
@@ -15,10 +14,8 @@ from src.blueprint_generator.generator import generate_blueprints_for_scenario
 from src.dedup.dedup import deduplicate
 from src.export.exporter import export_dataset
 from src.gold_plan_generator.generator import build_expected, generate_gold_plan
-from src.llm_backend.base import LLMBackend
 from src.llm_backend.config import create_backend
-from src.mock_environment.environment import MockMapEnvironment
-from src.mock_environment.tools import ToolExecutionError
+from src.pipeline.context import PipelineContext
 from src.negative_generator.generator import generate_negative_cases
 from src.pipeline.config import PipelineConfig
 from src.utterance_generator.generator import generate_utterances
@@ -51,13 +48,18 @@ class PipelineMetrics:
         r = self.report()
         print("\n=== Pipeline Metrics ===")
         for k, v in r.items():
-            pct = f"  ({v*100/max(self.candidates,1):.0f}%)" if self.candidates else ""
+            pct = f"  ({v * 100 / max(self.candidates, 1):.0f}%)" if self.candidates else ""
             print(f"  {k:25s} {v:>6d}{pct}")
         print()
 
 
 def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
     """Execute the full synthetic data generation pipeline."""
+    context = PipelineContext.from_profile_path(cfg.profile)
+    missing_handlers = context.validate_tool_registry()
+    if missing_handlers:
+        logger.warning("Tool catalog has no executable handlers for: %s", missing_handlers)
+
     llm = create_backend(
         backend=cfg.llm.backend,
         base_url=cfg.llm.base_url,
@@ -98,12 +100,13 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
             scenario,
             target_count=cfg.generation.blueprints_per_scenario,
             rng=rng,
+            context=context,
         )
 
         # 3. Gold plans + expected
         for bp in blueprints:
-            bp["_gold_trace"] = generate_gold_plan(bp, scenario, llm)
-            bp["_expected"] = build_expected(bp, bp["_gold_trace"])
+            bp["_gold_trace"] = generate_gold_plan(bp, scenario, llm, context=context)
+            bp["_expected"] = build_expected(bp, bp["_gold_trace"], context=context)
 
         # 4. Negative cases
         negatives = generate_negative_cases(
@@ -112,23 +115,27 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
             llm=llm,
             llm_adversarial_count=cfg.generation.llm_adversarial_per_scenario,
             rng=rng,
+            context=context,
         )
         for neg in negatives:
             neg["_gold_trace"] = []
-            neg["_expected"] = build_expected(neg, [])
+            neg["_expected"] = build_expected(neg, [], context=context)
 
         all_bps = blueprints + negatives
 
         # 5. Utterances + assemble samples
         for bp in all_bps:
             utterances = generate_utterances(
-                llm, bp, temperature=cfg.generation.temperature_utterance
+                llm,
+                bp,
+                temperature=cfg.generation.temperature_utterance,
+                context=context,
             )
             if not utterances:
                 utterances = [f"[auto] {bp.get('task_type', 'unknown')} task"]
 
             for utt in utterances:
-                sample = _assemble_sample(bp, scenario, utt)
+                sample = _assemble_sample(bp, scenario, utt, context=context)
                 all_candidates.append(sample)
 
     metrics.candidates = len(all_candidates)
@@ -149,14 +156,14 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
         metrics.schema_pass += 1
 
         # Gate 2: static
-        ok, errs = check_static(sample, scenario)
+        ok, errs = check_static(sample, scenario, context=context)
         if not ok:
             logger.debug("Static fail %s: %s", sample["id"], errs)
             continue
         metrics.static_pass += 1
 
         # Gate 3: execution
-        ok, errs, final_state = check_execution(sample, scenario)
+        ok, errs, final_state = check_execution(sample, scenario, context=context)
         if not ok:
             logger.debug("Exec fail %s: %s", sample["id"], errs)
             continue
@@ -165,7 +172,12 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
         # Gate 4: assertions
         assertions = sample.get("expected", {}).get("final_state_assertions", [])
         is_neg = sample.get("expected", {}).get("should_ask_clarification", False)
-        ok, errs = check_assertions(final_state, assertions, is_negative=is_neg)
+        ok, errs = check_assertions(
+            final_state,
+            assertions,
+            is_negative=is_neg,
+            context=context,
+        )
         if not ok:
             logger.debug("Assert fail %s: %s", sample["id"], errs)
             continue
@@ -185,13 +197,11 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
         verified.append(sample)
 
     # --- Stage 7: Dedup ---------------------------------------------------
-    deduped = deduplicate(verified)
+    deduped = deduplicate(verified, context=context)
     metrics.after_dedup = len(deduped)
 
     # --- Stage 8: Human review sampling -----------------------------------
-    review_samples = select_review_samples(
-        deduped, review_rate=cfg.verification.human_review_rate
-    )
+    review_samples = select_review_samples(deduped, review_rate=cfg.verification.human_review_rate)
     reports_dir = Path(cfg.reports_dir)
     reports_dir.mkdir(parents=True, exist_ok=True)
     export_review_queue(review_samples, reports_dir / "review_queue.jsonl")
@@ -212,16 +222,25 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
     return paths
 
 
-def _assemble_sample(bp: dict, scenario: dict, utterance: str) -> dict:
+def _assemble_sample(
+    bp: dict,
+    scenario: dict,
+    utterance: str,
+    *,
+    context: PipelineContext | None = None,
+) -> dict:
     """Turn a blueprint + utterance into a full TaskSample dict."""
     sample_id = f"mapagent_{uuid.uuid4().hex[:8]}"
     sid = scenario["scenario_id"]
 
     initial_state = bp.get("initial_state", {})
     if "selected" not in initial_state:
-        initial_state["selected"] = {"object": None, "line": None, "polygon": None}
+        slots = context.selection_slots if context else ["object", "line", "polygon"]
+        initial_state["selected"] = {slot: None for slot in slots}
     if "active_layers" not in initial_state:
-        initial_state["active_layers"] = ["vehicles", "cameras", "roads", "zones"]
+        initial_state["active_layers"] = (
+            list(context.active_layers) if context else ["vehicles", "cameras", "roads", "zones"]
+        )
     initial_state.setdefault("drawn_artifacts", [])
     initial_state["time"] = scenario.get("time", "")
 
@@ -253,7 +272,9 @@ def _assemble_sample(bp: dict, scenario: dict, utterance: str) -> dict:
     return {
         "id": sample_id,
         "scenario_id": sid,
-        "tool_catalog_version": "map_tools_v0.1",
+        "tool_catalog_version": (
+            context.profile.tool_catalog.version if context else "map_tools_v0.1"
+        ),
         "language": _detect_lang(utterance),
         "difficulty": difficulty,
         "task_type": task_type,

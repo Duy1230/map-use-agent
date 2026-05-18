@@ -39,6 +39,7 @@ class GenerationConfig:
 @dataclass
 class TargetDistribution:
     """Target sample counts per difficulty level."""
+
     L0: int = 150
     L1: int = 150
     L2: int = 250
@@ -68,6 +69,8 @@ class PipelineConfig:
     scenarios_dir: str = "scenarios"
     datasets_dir: str = "datasets"
     reports_dir: str = "reports"
+    profile: str = "profiles/traffic_map.yaml"
+    schema_version: str = "legacy"
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> PipelineConfig:
@@ -86,7 +89,13 @@ class PipelineConfig:
             cfg.targets = TargetDistribution(**data["targets"])
         if "verification" in data:
             cfg.verification = VerificationConfig(**data["verification"])
-        for key in ("scenarios_dir", "datasets_dir", "reports_dir"):
+        for key in (
+            "scenarios_dir",
+            "datasets_dir",
+            "reports_dir",
+            "profile",
+            "schema_version",
+        ):
             if key in data:
                 setattr(cfg, key, data[key])
         return cfg

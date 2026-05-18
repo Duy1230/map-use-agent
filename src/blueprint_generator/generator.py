@@ -1,11 +1,10 @@
-"""Blueprint generator — uses LLM to create task blueprints from scenarios."""
+"""Blueprint generator - uses LLM to create task blueprints from scenarios."""
 
 from __future__ import annotations
 
 import json
 import logging
 import random
-from typing import Any
 
 from src.blueprint_generator.prompts import (
     BLUEPRINT_SYSTEM,
@@ -13,22 +12,28 @@ from src.blueprint_generator.prompts import (
     DIFFICULTY_GUIDANCE,
     TASK_FAMILIES,
 )
+from src.domain.scenario import compact_scenario_objects
 from src.llm_backend.base import LLMBackend
+from src.pipeline.context import PipelineContext
 
 logger = logging.getLogger(__name__)
 
 
-def _compact_scenario(scenario: dict, max_vehicles: int = 5) -> str:
-    """Create a compact version of the scenario to stay within token limits."""
+def _compact_scenario(
+    scenario: dict,
+    *,
+    context: PipelineContext | None = None,
+    per_type_limit: int = 5,
+) -> str:
+    """Create a compact scenario payload to stay within token limits."""
     compact = {
         "scenario_id": scenario["scenario_id"],
         "time": scenario["time"],
-        "objects": {
-            "vehicles": scenario["objects"]["vehicles"][:max_vehicles],
-            "cameras": scenario["objects"]["cameras"][:5],
-            "polygons": scenario["objects"]["polygons"][:3],
-            "lines": scenario["objects"]["lines"][:3],
-        },
+        "objects": compact_scenario_objects(
+            scenario,
+            context.profile if context else None,
+            per_type_limit=per_type_limit,
+        ),
     }
     return json.dumps(compact, indent=2, ensure_ascii=False)
 
@@ -41,31 +46,26 @@ def generate_blueprint(
     *,
     tool_names: list[str] | None = None,
     temperature: float = 0.8,
+    context: PipelineContext | None = None,
 ) -> dict | None:
-    """Generate a single task blueprint via the LLM.
-
-    Returns the parsed blueprint dict, or None if all retries fail.
-    """
+    """Generate a single task blueprint via the LLM."""
     if tool_names is None:
-        tool_names = [
-            "get_current_map_state", "get_selected_entity", "resolve_entity",
-            "get_object_info", "get_vehicle_trajectory", "get_nearby_objects",
-            "get_polygon_area", "get_line_length", "get_objects_inside_polygon",
-            "get_objects_crossing_line", "highlight_objects", "draw_polyline",
-            "draw_polygon", "draw_marker", "show_popup", "clear_artifacts",
-        ]
+        tool_names = context.tool_names if context else []
 
+    difficulty_guidance = context.profile.difficulty_guidance if context else DIFFICULTY_GUIDANCE
     prompt = BLUEPRINT_USER.format(
-        scenario_json=_compact_scenario(scenario),
+        scenario_json=_compact_scenario(scenario, context=context),
         tool_names=json.dumps(tool_names),
         task_family=task_family,
-        difficulty=f"{difficulty} — {DIFFICULTY_GUIDANCE.get(difficulty, '')}",
+        difficulty=f"{difficulty} - {difficulty_guidance.get(difficulty, '')}",
     )
+    if context and context.profile.prompt_rules:
+        prompt += "\nProfile rules:\n" + "\n".join(
+            f"- {rule}" for rule in context.profile.prompt_rules
+        )
 
     try:
-        return llm.generate_json(
-            prompt, system=BLUEPRINT_SYSTEM, temperature=temperature
-        )
+        return llm.generate_json(prompt, system=BLUEPRINT_SYSTEM, temperature=temperature)
     except ValueError:
         logger.error("Failed to generate blueprint for %s/%s", task_family, difficulty)
         return None
@@ -77,16 +77,20 @@ def generate_blueprints_for_scenario(
     *,
     target_count: int = 10,
     rng: random.Random | None = None,
+    context: PipelineContext | None = None,
 ) -> list[dict]:
-    """Generate multiple blueprints for one scenario, sampling across families and difficulties."""
+    """Generate multiple blueprints for one scenario."""
     r = rng or random.Random()
-    difficulties = list(DIFFICULTY_GUIDANCE.keys())
+    difficulties = list(
+        (context.profile.difficulty_guidance if context else DIFFICULTY_GUIDANCE).keys()
+    )
+    task_families = context.profile.task_family_names if context else TASK_FAMILIES
 
     blueprints: list[dict] = []
     for _ in range(target_count):
-        family = r.choice(TASK_FAMILIES)
+        family = r.choice(task_families)
         diff = r.choice(difficulties)
-        bp = generate_blueprint(llm, scenario, family, diff)
+        bp = generate_blueprint(llm, scenario, family, diff, context=context)
         if bp is not None:
             bp.setdefault("_meta", {})
             bp["_meta"]["scenario_id"] = scenario["scenario_id"]

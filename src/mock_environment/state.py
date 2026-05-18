@@ -25,13 +25,39 @@ class Popup:
 @dataclass
 class MapState:
     time: str = ""
-    selected_object: dict | None = None
-    selected_line: dict | None = None
-    selected_polygon: dict | None = None
-    active_layers: list[str] = field(default_factory=lambda: ["vehicles", "cameras", "roads", "zones"])
+    selected_entities: dict[str, dict | list[dict] | None] = field(
+        default_factory=lambda: {"object": None, "line": None, "polygon": None}
+    )
+    active_layers: list[str] = field(
+        default_factory=lambda: ["vehicles", "cameras", "roads", "zones"]
+    )
     drawn_artifacts: list[DrawnArtifact] = field(default_factory=list)
     highlighted_objects: set[str] = field(default_factory=set)
     popups: list[Popup] = field(default_factory=list)
+
+    @property
+    def selected_object(self) -> dict | list[dict] | None:
+        return self.selected_entities.get("object")
+
+    @selected_object.setter
+    def selected_object(self, value: dict | list[dict] | None) -> None:
+        self.selected_entities["object"] = value
+
+    @property
+    def selected_line(self) -> dict | list[dict] | None:
+        return self.selected_entities.get("line")
+
+    @selected_line.setter
+    def selected_line(self, value: dict | list[dict] | None) -> None:
+        self.selected_entities["line"] = value
+
+    @property
+    def selected_polygon(self) -> dict | list[dict] | None:
+        return self.selected_entities.get("polygon")
+
+    @selected_polygon.setter
+    def selected_polygon(self, value: dict | list[dict] | None) -> None:
+        self.selected_entities["polygon"] = value
 
     # --- mutations --------------------------------------------------------
 
@@ -65,7 +91,9 @@ class MapState:
             self.highlighted_objects.clear()
             self.popups.clear()
         elif scope == "polylines":
-            self.drawn_artifacts = [a for a in self.drawn_artifacts if a.artifact_type != "polyline"]
+            self.drawn_artifacts = [
+                a for a in self.drawn_artifacts if a.artifact_type != "polyline"
+            ]
         elif scope == "polygons":
             self.drawn_artifacts = [a for a in self.drawn_artifacts if a.artifact_type != "polygon"]
         elif scope == "markers":
@@ -81,11 +109,7 @@ class MapState:
         """Return the subset of state visible to the agent."""
         return {
             "time": self.time,
-            "selected": {
-                "object": self.selected_object,
-                "line": self.selected_line,
-                "polygon": self.selected_polygon,
-            },
+            "selected": dict(self.selected_entities),
             "active_layers": self.active_layers,
             "drawn_artifacts": [
                 {

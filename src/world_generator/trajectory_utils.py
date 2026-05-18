@@ -44,11 +44,17 @@ def generate_trajectory(
     points = []
 
     for i in range(num_points):
-        ts = base_time - timedelta(minutes=duration_minutes) + timedelta(seconds=i * interval_seconds)
-        points.append({
-            "timestamp": ts.isoformat(),
-            "coordinates": [round(lon, 6), round(lat, 6)],
-        })
+        ts = (
+            base_time
+            - timedelta(minutes=duration_minutes)
+            + timedelta(seconds=i * interval_seconds)
+        )
+        points.append(
+            {
+                "timestamp": ts.isoformat(),
+                "coordinates": [round(lon, 6), round(lat, 6)],
+            }
+        )
         jitter_rad = r.gauss(0, 0.05)
         d_lat = meters_to_deg_lat(step_m) * math.cos(heading_rad + jitter_rad)
         d_lon = meters_to_deg_lon(step_m, lat) * math.sin(heading_rad + jitter_rad)

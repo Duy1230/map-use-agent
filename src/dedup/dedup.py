@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import re
 import unicodedata
+
+from src.pipeline.context import PipelineContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,11 @@ def _trace_structure_key(gold_trace: list[dict]) -> str:
     return _hash("|".join(tools))
 
 
-def deduplicate(samples: list[dict]) -> list[dict]:
+def deduplicate(
+    samples: list[dict],
+    *,
+    context: PipelineContext | None = None,
+) -> list[dict]:
     """Remove duplicates using 5 dedup levels.
 
     Levels:
@@ -69,14 +74,7 @@ def deduplicate(samples: list[dict]) -> list[dict]:
 
         # Level 3: composite key
         task_type = sample.get("task_type", "")
-        target_id = ""
-        initial = sample.get("initial_state", {})
-        selected = initial.get("selected", {})
-        for slot in ("object", "line", "polygon"):
-            ent = selected.get(slot)
-            if isinstance(ent, dict):
-                target_id = ent.get("id", "")
-                break
+        target_id = _target_id_for_sample(sample, context)
         time_range = ""
         for step in sample.get("gold_trace", []):
             tr = step.get("args", {}).get("time_range")
@@ -106,7 +104,37 @@ def deduplicate(samples: list[dict]) -> list[dict]:
     total_removed = sum(stats.values())
     logger.info(
         "Dedup: %d -> %d (removed %d: exact=%d, norm=%d, composite=%d, trace=%d)",
-        len(samples), len(kept), total_removed,
-        stats["exact"], stats["norm"], stats["composite"], stats["trace"],
+        len(samples),
+        len(kept),
+        total_removed,
+        stats["exact"],
+        stats["norm"],
+        stats["composite"],
+        stats["trace"],
     )
     return kept
+
+
+def _target_id_for_sample(sample: dict, context: PipelineContext | None) -> str:
+    initial = sample.get("initial_state", {})
+    selected = initial.get("selected", {})
+    slots = context.selection_slots if context else ["object", "line", "polygon"]
+    for slot in slots:
+        ent = selected.get(slot)
+        if isinstance(ent, dict):
+            return ent.get("id", "")
+        if isinstance(ent, list) and ent and isinstance(ent[0], dict):
+            return ent[0].get("id", "")
+
+    object_ref_args = (
+        context.profile.object_reference_args
+        if context and context.profile.object_reference_args
+        else ["object_id", "vehicle_id", "polygon_id", "line_id", "target_id"]
+    )
+    for step in sample.get("gold_trace", []):
+        args = step.get("args", {})
+        for key in object_ref_args:
+            value = args.get(key)
+            if isinstance(value, str) and not value.startswith("$"):
+                return value
+    return ""

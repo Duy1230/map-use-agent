@@ -97,6 +97,9 @@ targets:              # target sample count per difficulty
 verification:
   run_semantic_verifier: true
   human_review_rate: 0.10
+
+profile: "profiles/traffic_map.yaml"     # domain vocabulary and pipeline wiring
+schema_version: "legacy"                 # legacy | flexible
 ```
 
 **Environment variable overrides** (take precedence over the config file
@@ -172,7 +175,45 @@ Options:
       --target-samples INT   Overall target sample count
   -s, --stage TEXT           Run a single stage: worlds | full
   -o, --output-dir TEXT      Output directory for datasets
+      --profile TEXT         Domain profile YAML override
 ```
+
+---
+
+## Domain Profiles
+
+The current traffic-map setup is defined in `profiles/traffic_map.yaml`.
+The profile is the source of truth for domain vocabulary and generation
+wiring that used to be spread across Python modules:
+
+- object types, object collections, geometry expectations, and selection slots
+- active layers, time ranges, task families, difficulty guidance, and prompt rules
+- assertion names, negative-case strategies, and adversarial prompt patterns
+- declarative gold-plan templates for common task families
+- the versioned tool catalog used for valid tool names and parameter enums
+
+Use a profile override to run the same pipeline with a different domain:
+
+```bash
+python scripts/run_pipeline.py --profile profiles/traffic_map.yaml
+```
+
+### Customize without code
+
+Common changes only require editing YAML/JSON:
+
+- Add an object type by adding an `object_types` entry with `collection`,
+  `geometry`, and `selection_slot`.
+- Add a task family by adding `task_families` plus a `plan_templates` entry
+  that calls existing tools.
+- Change valid time windows by editing `time_ranges`; validators and prompts
+  consume the profile at runtime.
+- Change tool names, descriptions, and parameter enums in `tool_catalogs/*.json`;
+  blueprint prompts and static validation read the catalog.
+
+New executable behavior still requires Python: implement the handler in
+`src/mock_environment/tools.py`, register it in `TOOL_REGISTRY`, then reference
+that tool from the catalog/profile.
 
 ---
 
@@ -256,6 +297,7 @@ map-use-agent/
   pipeline_config.yaml         Default pipeline configuration
   Dockerfile                   Container build
 
+  profiles/                    Domain profiles (default: traffic_map.yaml)
   schemas/                     JSON Schemas (auto-generated from Pydantic)
   tool_catalogs/               Versioned canonical tool definitions
   scenarios/                   Generated synthetic map worlds
@@ -264,6 +306,7 @@ map-use-agent/
 
   src/
     schemas.py                 Pydantic models (source of truth)
+    domain/                    Profile loading and generic scenario access
     llm_backend/               LLM abstraction (vLLM, llama.cpp, API)
     world_generator/           Deterministic world + trajectory generation
     blueprint_generator/       LLM-driven task blueprint generation
@@ -289,8 +332,11 @@ map-use-agent/
 
 1. Add the tool definition to `tool_catalogs/map_tools_v0_2.json`
 2. Implement the handler in `src/mock_environment/tools.py` and register it in `TOOL_REGISTRY`
-3. Add a deterministic plan template in `src/gold_plan_generator/generator.py` (optional)
-4. Update `src/verification/static_checker.py` `VALID_TOOL_NAMES`
+3. Reference the tool catalog from a profile
+4. Add a declarative `plan_templates` entry if an existing task family can use it
+
+Static validation reads tool names and parameter enums from the catalog, so no
+separate `VALID_TOOL_NAMES` edit is needed.
 
 ### Adding a new LLM backend
 

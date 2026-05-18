@@ -46,19 +46,21 @@ def verify_semantic(
     compact = {
         k: sample.get(k)
         for k in (
-            "id", "task_type", "difficulty", "user_request",
-            "initial_state", "gold_trace", "expected", "tags",
+            "id",
+            "task_type",
+            "difficulty",
+            "user_request",
+            "initial_state",
+            "gold_trace",
+            "expected",
+            "tags",
         )
     }
 
-    prompt = VERIFIER_USER.format(
-        candidate_json=json.dumps(compact, indent=2, ensure_ascii=False)
-    )
+    prompt = VERIFIER_USER.format(candidate_json=json.dumps(compact, indent=2, ensure_ascii=False))
 
     try:
-        result = llm.generate_json(
-            prompt, system=VERIFIER_SYSTEM, temperature=temperature
-        )
+        result = llm.generate_json(prompt, system=VERIFIER_SYSTEM, temperature=temperature)
     except ValueError:
         logger.error("Semantic verification failed for %s", sample.get("id"))
         return (False, ["LLM verifier returned invalid JSON"])

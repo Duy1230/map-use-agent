@@ -44,8 +44,7 @@ class LLMBackend(ABC):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         response_format: dict | None = None,
-    ) -> LLMResponse:
-        ...
+    ) -> LLMResponse: ...
 
     def generate_json(
         self,
@@ -73,8 +72,6 @@ class LLMBackend(ABC):
                 logger.warning("JSON parse failed (attempt %d/%d): %s", attempt, retries, exc)
         raise ValueError(f"Failed to get valid JSON after {retries} attempts") from last_err
 
-    def generate_batch(
-        self, prompts: list[str], **kwargs
-    ) -> list[LLMResponse]:
+    def generate_batch(self, prompts: list[str], **kwargs) -> list[LLMResponse]:
         """Default sequential batch; backends may override with true batching."""
         return [self.generate(p, **kwargs) for p in prompts]

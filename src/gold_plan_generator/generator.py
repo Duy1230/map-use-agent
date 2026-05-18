@@ -8,15 +8,18 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from src.llm_backend.base import LLMBackend
+from src.pipeline.context import PipelineContext
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Deterministic plan templates keyed by task_type
 # ---------------------------------------------------------------------------
+
 
 def _plan_draw_vehicle_trajectory(bp: dict, scenario: dict) -> list[dict]:
     target = bp.get("target", {})
@@ -28,18 +31,22 @@ def _plan_draw_vehicle_trajectory(bp: dict, scenario: dict) -> list[dict]:
     if target.get("reference_mode") == "selected_object":
         steps.append({"tool": "get_selected_entity", "args": {"entity_type": "object"}})
 
-    steps.append({
-        "tool": "get_vehicle_trajectory",
-        "args": {"vehicle_id": vehicle_id, "time_range": time_range},
-    })
-    steps.append({
-        "tool": "draw_polyline",
-        "args": {
-            "points": "$get_vehicle_trajectory.points",
-            "label": f"Trajectory of {vehicle_id}",
-            "source_object_id": vehicle_id,
-        },
-    })
+    steps.append(
+        {
+            "tool": "get_vehicle_trajectory",
+            "args": {"vehicle_id": vehicle_id, "time_range": time_range},
+        }
+    )
+    steps.append(
+        {
+            "tool": "draw_polyline",
+            "args": {
+                "points": "$get_vehicle_trajectory.points",
+                "label": f"Trajectory of {vehicle_id}",
+                "source_object_id": vehicle_id,
+            },
+        }
+    )
     return steps
 
 
@@ -50,10 +57,12 @@ def _plan_show_object_info(bp: dict, scenario: dict) -> list[dict]:
     if target.get("reference_mode") == "selected_object":
         steps.append({"tool": "get_selected_entity", "args": {"entity_type": "object"}})
     steps.append({"tool": "get_object_info", "args": {"object_id": object_id}})
-    steps.append({
-        "tool": "show_popup",
-        "args": {"target_id": object_id, "content": f"Info for {object_id}"},
-    })
+    steps.append(
+        {
+            "tool": "show_popup",
+            "args": {"target_id": object_id, "content": f"Info for {object_id}"},
+        }
+    )
     return steps
 
 
@@ -74,14 +83,18 @@ def _plan_objects_inside_polygon(bp: dict, scenario: dict) -> list[dict]:
     steps: list[dict] = [{"tool": "get_current_map_state", "args": {}}]
     if target.get("reference_mode") == "selected_object":
         steps.append({"tool": "get_selected_entity", "args": {"entity_type": "polygon"}})
-    steps.append({
-        "tool": "get_objects_inside_polygon",
-        "args": {"polygon_id": polygon_id, "object_type": obj_type},
-    })
-    steps.append({
-        "tool": "highlight_objects",
-        "args": {"object_ids": "$get_objects_inside_polygon.results"},
-    })
+    steps.append(
+        {
+            "tool": "get_objects_inside_polygon",
+            "args": {"polygon_id": polygon_id, "object_type": obj_type},
+        }
+    )
+    steps.append(
+        {
+            "tool": "highlight_objects",
+            "args": {"object_ids": "$get_objects_inside_polygon.results"},
+        }
+    )
     return steps
 
 
@@ -92,9 +105,14 @@ def _plan_objects_crossing_line(bp: dict, scenario: dict) -> list[dict]:
     obj_type = bp.get("constraints", {}).get("object_type", "vehicle")
     return [
         {"tool": "get_current_map_state", "args": {}},
-        {"tool": "get_objects_crossing_line", "args": {
-            "line_id": line_id, "object_type": obj_type, "time_range": time_range,
-        }},
+        {
+            "tool": "get_objects_crossing_line",
+            "args": {
+                "line_id": line_id,
+                "object_type": obj_type,
+                "time_range": time_range,
+            },
+        },
     ]
 
 
@@ -123,9 +141,14 @@ def _plan_nearby_objects(bp: dict, scenario: dict) -> list[dict]:
     radius = bp.get("constraints", {}).get("radius_meters", 1000)
     return [
         {"tool": "get_current_map_state", "args": {}},
-        {"tool": "get_nearby_objects", "args": {
-            "object_id": object_id, "object_type": obj_type, "radius_meters": radius,
-        }},
+        {
+            "tool": "get_nearby_objects",
+            "args": {
+                "object_id": object_id,
+                "object_type": obj_type,
+                "radius_meters": radius,
+            },
+        },
         {"tool": "highlight_objects", "args": {"object_ids": "$get_nearby_objects.results"}},
     ]
 
@@ -175,10 +198,16 @@ def _plan_via_llm(bp: dict, scenario: dict, llm: LLMBackend) -> list[dict]:
 # Public API
 # ---------------------------------------------------------------------------
 
+_TEMPLATE_RE = re.compile(r"^\{\{\s*([^}|]+?)(?:\|([^}]+?))?\s*\}\}$")
+_INLINE_TEMPLATE_RE = re.compile(r"\{\{\s*([^}|]+?)(?:\|([^}]+?))?\s*\}\}")
+
+
 def generate_gold_plan(
     blueprint: dict,
     scenario: dict,
     llm: LLMBackend | None = None,
+    *,
+    context: PipelineContext | None = None,
 ) -> list[dict]:
     """Generate a gold tool-call trace from a blueprint.
 
@@ -188,6 +217,9 @@ def generate_gold_plan(
         return []
 
     task_type = blueprint.get("task_type", "")
+    if context and task_type in context.profile.plan_templates:
+        return _plan_from_template(context.profile.plan_templates[task_type], blueprint)
+
     planner = _DETERMINISTIC_PLANS.get(task_type)
 
     if planner is not None:
@@ -203,12 +235,90 @@ def generate_gold_plan(
 def build_expected(
     blueprint: dict,
     gold_trace: list[dict],
+    *,
+    context: PipelineContext | None = None,
 ) -> dict:
     """Build the 'expected' section from the blueprint and gold trace."""
+    allowed_extra_tools = (
+        context.profile.allowed_extra_tools
+        if context and context.profile.allowed_extra_tools
+        else ["get_object_info", "resolve_entity", "get_current_map_state"]
+    )
     return {
         "required_semantic_steps": blueprint.get("required_semantic_steps", []),
-        "allowed_extra_tools": ["get_object_info", "resolve_entity", "get_current_map_state"],
+        "allowed_extra_tools": allowed_extra_tools,
         "forbidden_tools": [],
         "final_state_assertions": blueprint.get("expected_final_state", []),
         "should_ask_clarification": blueprint.get("should_ask_clarification", False),
     }
+
+
+def _plan_from_template(template: list[dict[str, Any]], blueprint: dict) -> list[dict]:
+    trace: list[dict] = []
+    for raw_step in template:
+        condition = raw_step.get("when")
+        if condition and not _condition_matches(condition, blueprint):
+            continue
+        step = {
+            "tool": raw_step["tool"],
+            "args": _resolve_template_value(raw_step.get("args", {}), blueprint),
+        }
+        trace.append(step)
+    return trace
+
+
+def _condition_matches(condition: dict[str, Any], blueprint: dict) -> bool:
+    actual = _get_path(blueprint, condition.get("path", ""))
+    if "equals" in condition:
+        return actual == condition["equals"]
+    if "not_equals" in condition:
+        return actual != condition["not_equals"]
+    return bool(actual)
+
+
+def _resolve_template_value(value: Any, blueprint: dict) -> Any:
+    if isinstance(value, dict):
+        return {k: _resolve_template_value(v, blueprint) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve_template_value(v, blueprint) for v in value]
+    if not isinstance(value, str):
+        return value
+
+    full_match = _TEMPLATE_RE.match(value)
+    if full_match:
+        return _template_lookup(blueprint, full_match.group(1), full_match.group(2))
+
+    def replace(match: re.Match) -> str:
+        resolved = _template_lookup(blueprint, match.group(1), match.group(2))
+        return "" if resolved is None else str(resolved)
+
+    return _INLINE_TEMPLATE_RE.sub(replace, value)
+
+
+def _template_lookup(blueprint: dict, path: str, default: str | None = None) -> Any:
+    value = _get_path(blueprint, path.strip())
+    if value is None and default is not None:
+        return _coerce_default(default.strip())
+    return value
+
+
+def _get_path(data: dict, path: str) -> Any:
+    current: Any = data
+    for part in path.split("."):
+        if not part:
+            continue
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
+def _coerce_default(value: str) -> Any:
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        return value

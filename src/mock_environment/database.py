@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
+from src.domain.profile import DomainProfile
+from src.domain.scenario import iter_scenario_objects
 from shapely.geometry import LineString, Point, Polygon
 
 from src.world_generator.geometry_utils import haversine_m
@@ -31,16 +32,17 @@ class TypeMismatchError(Exception):
 class ScenarioDatabase:
     """Loads a scenario dict and provides deterministic query methods."""
 
-    def __init__(self, scenario: dict) -> None:
+    def __init__(self, scenario: dict, *, profile: DomainProfile | None = None) -> None:
         self.scenario = scenario
+        self.profile = profile
         self.time = scenario["time"]
+        self.time_ranges = profile.time_ranges if profile else TIME_RANGE_MINUTES
 
         self._objects: dict[str, dict] = {}
         self._by_type: dict[str, list[dict]] = {}
-        for category in ("vehicles", "cameras", "polygons", "lines"):
-            for obj in scenario.get("objects", {}).get(category, []):
-                self._objects[obj["id"]] = obj
-                self._by_type.setdefault(obj["type"], []).append(obj)
+        for obj in iter_scenario_objects(scenario, profile):
+            self._objects[obj["id"]] = obj
+            self._by_type.setdefault(obj["type"], []).append(obj)
 
         self._time_series: dict[str, dict] = scenario.get("time_series", {})
 
@@ -68,27 +70,19 @@ class ScenarioDatabase:
 
     # --- trajectory -------------------------------------------------------
 
-    def get_vehicle_trajectory(
-        self, vehicle_id: str, time_range: str
-    ) -> list[dict]:
+    def get_vehicle_trajectory(self, vehicle_id: str, time_range: str) -> list[dict]:
         obj = self.get_object(vehicle_id)
         if obj["type"] != "vehicle":
-            raise TypeMismatchError(
-                f"Object {vehicle_id!r} is type {obj['type']!r}, not 'vehicle'"
-            )
+            raise TypeMismatchError(f"Object {vehicle_id!r} is type {obj['type']!r}, not 'vehicle'")
 
         ts_data = self._time_series.get(vehicle_id, {}).get("trajectory", [])
         if not ts_data:
             return []
 
-        minutes = TIME_RANGE_MINUTES.get(time_range, 10)
+        minutes = self.time_ranges.get(time_range, 10)
         cutoff = datetime.fromisoformat(self.time) - timedelta(minutes=minutes)
 
-        return [
-            pt
-            for pt in ts_data
-            if datetime.fromisoformat(pt["timestamp"]) >= cutoff
-        ]
+        return [pt for pt in ts_data if datetime.fromisoformat(pt["timestamp"]) >= cutoff]
 
     # --- spatial queries --------------------------------------------------
 
@@ -111,9 +105,7 @@ class ScenarioDatabase:
                 results.append({**obj, "_distance_m": round(dist, 1)})
         return results
 
-    def get_objects_inside_polygon(
-        self, polygon_id: str, object_type: str
-    ) -> list[dict]:
+    def get_objects_inside_polygon(self, polygon_id: str, object_type: str) -> list[dict]:
         poly_obj = self.get_object(polygon_id)
         if poly_obj["type"] != "polygon":
             raise TypeMismatchError(
@@ -137,12 +129,10 @@ class ScenarioDatabase:
     ) -> list[dict]:
         line_obj = self.get_object(line_id)
         if line_obj["type"] != "line":
-            raise TypeMismatchError(
-                f"Object {line_id!r} is type {line_obj['type']!r}, not 'line'"
-            )
+            raise TypeMismatchError(f"Object {line_id!r} is type {line_obj['type']!r}, not 'line'")
 
         line = LineString(line_obj["geometry"]["coordinates"])
-        minutes = TIME_RANGE_MINUTES.get(time_range, 10)
+        minutes = self.time_ranges.get(time_range, 10)
         cutoff = datetime.fromisoformat(self.time) - timedelta(minutes=minutes)
 
         results = []
@@ -170,6 +160,7 @@ class ScenarioDatabase:
         # Rough conversion: 1 deg ~111km at equator. Use cos(lat) for lon.
         lat_mid = sum(c[1] for c in coords) / len(coords)
         import math
+
         deg2m_lat = 111_320
         deg2m_lon = 111_320 * math.cos(math.radians(lat_mid))
         # Scale Shapely area (in degrees^2) to m^2
@@ -178,9 +169,7 @@ class ScenarioDatabase:
     def get_line_length_m(self, line_id: str) -> float:
         line_obj = self.get_object(line_id)
         if line_obj["type"] != "line":
-            raise TypeMismatchError(
-                f"Object {line_id!r} is type {line_obj['type']!r}, not 'line'"
-            )
+            raise TypeMismatchError(f"Object {line_id!r} is type {line_obj['type']!r}, not 'line'")
         coords = line_obj["geometry"]["coordinates"]
         total = 0.0
         for i in range(len(coords) - 1):

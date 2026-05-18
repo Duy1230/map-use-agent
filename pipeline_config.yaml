@@ -35,3 +35,5 @@ verification:
 scenarios_dir: "scenarios"
 datasets_dir: "datasets"
 reports_dir: "reports"
+profile: "profiles/traffic_map.yaml"
+schema_version: "legacy"

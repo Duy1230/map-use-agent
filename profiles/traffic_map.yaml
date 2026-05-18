@@ -1,0 +1,235 @@
+name: traffic_map
+tool_catalog: ../tool_catalogs/map_tools_v0_1.json
+schema_version: legacy
+
+object_types:
+  vehicle:
+    collection: vehicles
+    geometry: Point
+    selection_slot: object
+    aliases: ["vehicle", "car", "truck", "bus", "van", "motorbike", "xe"]
+  camera:
+    collection: cameras
+    geometry: Point
+    selection_slot: object
+    aliases: ["camera", "cam"]
+  polygon:
+    collection: polygons
+    geometry: Polygon
+    selection_slot: polygon
+    aliases: ["polygon", "zone", "region", "vung"]
+  line:
+    collection: lines
+    geometry: LineString
+    selection_slot: line
+    aliases: ["line", "road", "duong"]
+
+selection_slots: ["object", "line", "polygon"]
+layers: ["vehicles", "cameras", "roads", "zones"]
+
+time_ranges:
+  last_5_minutes: 5
+  last_10_minutes: 10
+  last_30_minutes: 30
+  last_1_hour: 60
+  today: 1440
+
+task_families:
+  - name: draw_vehicle_trajectory
+    difficulty: ["L1", "L2", "L3"]
+    description: Draw a vehicle trajectory over a time range.
+  - name: show_object_info
+    difficulty: ["L1", "L2"]
+    description: Show a popup with object information.
+  - name: highlight_selected_entity
+    difficulty: ["L2"]
+    description: Highlight the selected entity.
+  - name: objects_inside_polygon
+    difficulty: ["L3"]
+    description: Highlight objects inside a polygon.
+  - name: objects_crossing_line
+    difficulty: ["L3"]
+    description: Find objects crossing a line.
+  - name: polygon_area
+    difficulty: ["L1"]
+    description: Calculate polygon area.
+  - name: line_length
+    difficulty: ["L1"]
+    description: Calculate line length.
+  - name: nearby_objects
+    difficulty: ["L3"]
+    description: Highlight nearby objects.
+  - name: artifact_modification
+    difficulty: ["L4"]
+    description: Modify existing map artifacts.
+  - name: unsupported_or_ambiguous
+    difficulty: ["L0", "L5"]
+    description: Require clarification or refusal.
+
+difficulty_guidance:
+  L0: Clarification or no-tool task. The user request is ambiguous, references something missing, or the agent should ask for more info.
+  L1: Single tool call with an explicit object ID reference.
+  L2: Selected reference resolution. The user says this vehicle, this polygon, or this line and the agent must resolve from state.
+  L3: Multi-step tool chain with at least 2-3 tool calls in sequence.
+  L4: Multi-turn or artifact-aware interaction. The task depends on previously drawn artifacts.
+  L5: Adversarial ambiguity, type mismatch, visual reference, or dangerous action.
+
+prompt_rules:
+  - Do not invent object IDs outside the provided scenario.
+  - If a task uses a deictic reference, the initial state must contain a selected entity in the matching selection slot.
+  - For negative cases, explicitly specify why the agent must ask for clarification.
+  - Every task must have final_state_assertions.
+  - Prefer semantic correctness over linguistic diversity.
+
+utterance_styles:
+  - vi_formal
+  - vi_casual
+  - en
+  - vi_en_code_mixed
+  - short_command
+  - noisy_typo
+
+assertions:
+  - artifact_exists
+  - object_highlighted
+  - objects_highlighted
+  - popup_shown
+  - artifact_removed
+  - polyline_source_matches_vehicle
+  - objects_inside_polygon_highlighted
+  - no_tool_called
+  - clarification_requested
+
+allowed_extra_tools:
+  - get_object_info
+  - resolve_entity
+  - get_current_map_state
+
+object_reference_args:
+  - object_id
+  - vehicle_id
+  - polygon_id
+  - line_id
+  - target_id
+
+tool_type_constraints:
+  get_vehicle_trajectory:
+    vehicle_id: vehicle
+  get_polygon_area:
+    polygon_id: polygon
+  get_objects_inside_polygon:
+    polygon_id: polygon
+  get_line_length:
+    line_id: line
+  get_objects_crossing_line:
+    line_id: line
+
+negative_strategies:
+  enabled:
+    - missing_selected
+    - type_mismatch
+    - multiple_selected
+    - nonexistent_id
+  wrong_type_pairs:
+    vehicle: camera
+    camera: vehicle
+    polygon: line
+    line: polygon
+  adversarial_patterns:
+    - Visual reference that cannot be resolved from structured state.
+    - Unsupported action such as deleting an object or changing the basemap.
+    - Dangerous action that clears all data without confirmation.
+    - Tool confusion such as asking for trajectory of a camera.
+
+plan_templates:
+  draw_vehicle_trajectory:
+    - tool: get_current_map_state
+      args: {}
+    - when:
+        path: target.reference_mode
+        equals: selected_object
+      tool: get_selected_entity
+      args:
+        entity_type: object
+    - tool: get_vehicle_trajectory
+      args:
+        vehicle_id: "{{ target.object_id }}"
+        time_range: "{{ constraints.time_range|last_10_minutes }}"
+    - tool: draw_polyline
+      args:
+        points: "$get_vehicle_trajectory.points"
+        label: "Trajectory of {{ target.object_id }}"
+        source_object_id: "{{ target.object_id }}"
+  show_object_info:
+    - tool: get_current_map_state
+      args: {}
+    - when:
+        path: target.reference_mode
+        equals: selected_object
+      tool: get_selected_entity
+      args:
+        entity_type: object
+    - tool: get_object_info
+      args:
+        object_id: "{{ target.object_id }}"
+    - tool: show_popup
+      args:
+        target_id: "{{ target.object_id }}"
+        content: "Info for {{ target.object_id }}"
+  highlight_selected_entity:
+    - tool: get_current_map_state
+      args: {}
+    - tool: get_selected_entity
+      args:
+        entity_type: object
+    - tool: highlight_objects
+      args:
+        object_ids:
+          - "{{ target.object_id }}"
+  objects_inside_polygon:
+    - tool: get_current_map_state
+      args: {}
+    - when:
+        path: target.reference_mode
+        equals: selected_object
+      tool: get_selected_entity
+      args:
+        entity_type: polygon
+    - tool: get_objects_inside_polygon
+      args:
+        polygon_id: "{{ target.object_id }}"
+        object_type: "{{ constraints.object_type|vehicle }}"
+    - tool: highlight_objects
+      args:
+        object_ids: "$get_objects_inside_polygon.results"
+  objects_crossing_line:
+    - tool: get_current_map_state
+      args: {}
+    - tool: get_objects_crossing_line
+      args:
+        line_id: "{{ target.object_id }}"
+        object_type: "{{ constraints.object_type|vehicle }}"
+        time_range: "{{ constraints.time_range|last_10_minutes }}"
+  polygon_area:
+    - tool: get_current_map_state
+      args: {}
+    - tool: get_polygon_area
+      args:
+        polygon_id: "{{ target.object_id }}"
+  line_length:
+    - tool: get_current_map_state
+      args: {}
+    - tool: get_line_length
+      args:
+        line_id: "{{ target.object_id }}"
+  nearby_objects:
+    - tool: get_current_map_state
+      args: {}
+    - tool: get_nearby_objects
+      args:
+        object_id: "{{ target.object_id }}"
+        object_type: "{{ constraints.object_type|camera }}"
+        radius_meters: "{{ constraints.radius_meters|1000 }}"
+    - tool: highlight_objects
+      args:
+        object_ids: "$get_nearby_objects.results"

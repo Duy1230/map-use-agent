@@ -1,24 +1,8 @@
 {
-  "$defs": {
-    "AssertionType": {
-      "enum": [
-        "artifact_exists",
-        "object_highlighted",
-        "objects_highlighted",
-        "popup_shown",
-        "artifact_removed",
-        "polyline_source_matches_vehicle",
-        "objects_inside_polygon_highlighted",
-        "no_tool_called",
-        "clarification_requested"
-      ],
-      "title": "AssertionType",
-      "type": "string"
-    }
-  },
   "properties": {
     "type": {
-      "$ref": "#/$defs/AssertionType"
+      "title": "Type",
+      "type": "string"
     },
     "artifact_type": {
       "anyOf": [

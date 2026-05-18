@@ -243,6 +243,16 @@
     "objects": {
       "$ref": "#/$defs/ScenarioObjects"
     },
+    "objects_by_type": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/MapObject"
+        },
+        "type": "array"
+      },
+      "title": "Objects By Type",
+      "type": "object"
+    },
     "time_series": {
       "additionalProperties": {
         "additionalProperties": {

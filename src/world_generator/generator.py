@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 from src.world_generator.geometry_utils import (
@@ -60,18 +60,20 @@ def generate_world(
         speed = round(rng.uniform(20, 80), 1)
         heading = round(rng.uniform(0, 360), 1)
 
-        vehicles.append({
-            "id": vid,
-            "type": "vehicle",
-            "name": name_en,
-            "aliases": [name_vi, plate, f"xe {i:03d}"],
-            "geometry": {"type": "Point", "coordinates": [lon, lat]},
-            "properties": {
-                "speed_kmh": speed,
-                "status": rng.choice(["moving", "stopped", "idle"]),
-                "heading_deg": heading,
-            },
-        })
+        vehicles.append(
+            {
+                "id": vid,
+                "type": "vehicle",
+                "name": name_en,
+                "aliases": [name_vi, plate, f"xe {i:03d}"],
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": {
+                    "speed_kmh": speed,
+                    "status": rng.choice(["moving", "stopped", "idle"]),
+                    "heading_deg": heading,
+                },
+            }
+        )
 
         traj = generate_trajectory(
             lon,
@@ -88,14 +90,16 @@ def generate_world(
     for i in range(1, num_cameras + 1):
         cid = f"camera_{i:02d}"
         lon, lat = random_point(bbox, rng)
-        cameras.append({
-            "id": cid,
-            "type": "camera",
-            "name": f"Camera {i:02d}",
-            "aliases": [f"cam {i:02d}", f"camera số {i}"],
-            "geometry": {"type": "Point", "coordinates": [lon, lat]},
-            "properties": {},
-        })
+        cameras.append(
+            {
+                "id": cid,
+                "type": "camera",
+                "name": f"Camera {i:02d}",
+                "aliases": [f"cam {i:02d}", f"camera số {i}"],
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": {},
+            }
+        )
 
     polygons = []
     for i in range(1, num_zones + 1):
@@ -104,27 +108,31 @@ def generate_world(
         w = rng.uniform(300, 800)
         h = rng.uniform(300, 800)
         ring = random_rectangle(center, width_m=w, height_m=h, rng=rng)
-        polygons.append({
-            "id": pid,
-            "type": "polygon",
-            "name": f"Zone {i:02d}",
-            "aliases": [f"vùng {i:02d}", f"khu vực {i}"],
-            "geometry": {"type": "Polygon", "coordinates": [ring]},
-            "properties": {},
-        })
+        polygons.append(
+            {
+                "id": pid,
+                "type": "polygon",
+                "name": f"Zone {i:02d}",
+                "aliases": [f"vùng {i:02d}", f"khu vực {i}"],
+                "geometry": {"type": "Polygon", "coordinates": [ring]},
+                "properties": {},
+            }
+        )
 
     lines = []
     for i in range(1, num_roads + 1):
         lid = f"road_{i:02d}"
         coords = random_road_segment(bbox, length_m=rng.uniform(500, 1500), rng=rng)
-        lines.append({
-            "id": lid,
-            "type": "line",
-            "name": f"Road {i:02d}",
-            "aliases": [f"đường {i:02d}", f"tuyến {i}"],
-            "geometry": {"type": "LineString", "coordinates": coords},
-            "properties": {},
-        })
+        lines.append(
+            {
+                "id": lid,
+                "type": "line",
+                "name": f"Road {i:02d}",
+                "aliases": [f"đường {i:02d}", f"tuyến {i}"],
+                "geometry": {"type": "LineString", "coordinates": coords},
+                "properties": {},
+            }
+        )
 
     return {
         "scenario_id": scenario_id,

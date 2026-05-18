@@ -1,9 +1,14 @@
 """Export Pydantic models to JSON Schema files in schemas/."""
 
 import json
+import sys
 from pathlib import Path
 
-from src.schemas import (
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from src.schemas import (  # noqa: E402
     FinalStateAssertion,
     MapState,
     Scenario,

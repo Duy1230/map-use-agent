@@ -45,9 +45,7 @@ class LlamaCppBackend(LLMBackend):
                 max_tokens=max_tokens,
                 response_format=response_format,
             )
-        return self._generate_native(
-            prompt, temperature=temperature, max_tokens=max_tokens
-        )
+        return self._generate_native(prompt, temperature=temperature, max_tokens=max_tokens)
 
     def _generate_openai_compat(
         self,
