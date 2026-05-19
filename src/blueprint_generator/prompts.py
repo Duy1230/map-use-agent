@@ -69,3 +69,69 @@ DIFFICULTY_GUIDANCE = {
     "L4": "Multi-turn or artifact-aware interaction — the task depends on previously drawn artifacts.",
     "L5": "Adversarial — ambiguity, type mismatch, visual reference, or dangerous action.",
 }
+
+
+# ---------------------------------------------------------------------------
+# Aircraft track analysis domain prompts
+# ---------------------------------------------------------------------------
+
+AIRCRAFT_BLUEPRINT_SYSTEM = """\
+You are generating synthetic evaluation blueprints for an aircraft track analysis agent.
+
+The agent is a tool-use LLM serving military radar operators (VQ system). It can only use:
+1. User request (natural language, often Vietnamese military jargon)
+2. The 14-tool aircraft analysis catalog (getTrackInfo, getTrackPoints, getKinematicStats, analyzeSpatial, detectBehavior, lookupAircraftModel, lookupFlightPlan, findRelated, findNearestPOI, computeDistance, getReferenceData, mapDraw, mapControl, drawChart)
+3. Scenario state with tracks, POIs, restricted zones, routes
+
+Generate a task blueprint — NOT a natural language user request.
+
+Rules:
+- Do not invent track IDs outside the provided scenario.
+- Every task must reference a valid trackId unless it is an adversarial case.
+- For adversarial cases, specify why the agent must clarify or acknowledge scope limits.
+- Tool arguments must use exact enum values from the catalog.
+- Return valid JSON only, no markdown fences."""
+
+AIRCRAFT_BLUEPRINT_USER = """\
+Scenario:
+{scenario_json}
+
+Available tools:
+{tool_names}
+
+Requested task family:
+{task_family}
+
+Difficulty:
+{difficulty}
+
+Generate a single task blueprint as a JSON object with these fields:
+- task_type (string, e.g. routine_surveillance, target_identification, threat_detection, behavioral_anomaly, decision_support, coordination, post_event_reporting, spatial_flexible, adversarial)
+- difficulty (string: Easy, Medium, or Hard)
+- target (object with reference_mode, expected_type, object_id — object_id is a trackId)
+- constraints (object, may include pattern, dimension, aspect, poiType, etc.)
+- required_semantic_steps (array of strings)
+- expected_final_state (array of assertion objects with at least "type")
+- should_ask_clarification (boolean)
+- negative_case (boolean)
+- initial_state (object, typically empty for aircraft domain)
+
+Return JSON only."""
+
+AIRCRAFT_TASK_FAMILIES = [
+    "routine_surveillance",
+    "target_identification",
+    "threat_detection",
+    "behavioral_anomaly",
+    "decision_support",
+    "coordination",
+    "post_event_reporting",
+    "spatial_flexible",
+    "adversarial",
+]
+
+AIRCRAFT_DIFFICULTY_GUIDANCE = {
+    "Easy": "Single tool call or simple lookup. Direct answer with minimal orchestration.",
+    "Medium": "2-3 tool calls, conditional logic, or comparison between data sources.",
+    "Hard": "4+ tool calls, multi-track aggregation, cross-reference, formatted output, or adversarial edge cases.",
+}

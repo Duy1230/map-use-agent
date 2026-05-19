@@ -91,6 +91,25 @@ def check_static(
             if val and isinstance(val, str) and not val.startswith("$"):
                 if val not in all_object_ids and not is_negative:
                     errors.append(f"gold_trace[{i}].args.{key}={val!r} not in scenario objects")
+        if context:
+            conditional_refs = context.profile.conditional_object_reference_args.get(tool, {})
+            for arg_name, rule in conditional_refs.items():
+                if not _conditional_reference_applies(args, rule):
+                    continue
+                val = args.get(arg_name)
+                if not val or not isinstance(val, str) or val.startswith("$"):
+                    continue
+                if val not in all_object_ids and not is_negative:
+                    errors.append(
+                        f"gold_trace[{i}].args.{arg_name}={val!r} not in scenario objects"
+                    )
+                    continue
+                expected_type = rule.get("expected_type")
+                if expected_type and val in object_types and object_types[val] != expected_type:
+                    errors.append(
+                        f"gold_trace[{i}]: {tool} called on "
+                        f"{object_types[val]!r} ({val}), expected {expected_type!r}"
+                    )
 
         # Type-specific checks derived from the profile.
         constraints = type_constraints.get(tool, {})
@@ -117,6 +136,13 @@ def _check_entity_exists(entity: dict, all_ids: set[str], errors: list[str]) -> 
     eid = entity.get("id")
     if eid and eid not in all_ids:
         errors.append(f"Selected entity {eid!r} not found in scenario")
+
+
+def _conditional_reference_applies(args: dict, rule: dict) -> bool:
+    condition = rule.get("when", {})
+    if not condition:
+        return True
+    return all(args.get(key) == value for key, value in condition.items())
 
 
 def _legacy_type_constraints(tool: str) -> dict[str, str]:

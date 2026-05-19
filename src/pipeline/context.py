@@ -8,6 +8,17 @@ from pathlib import Path
 from src.domain.profile import DomainProfile
 from src.mock_environment.tools import TOOL_REGISTRY
 
+_AIRCRAFT_PROFILE_NAMES = {"aircraft_track", "aircraft"}
+
+
+def _select_tool_registry(profile: DomainProfile) -> dict:
+    """Return the tool registry matching the profile domain."""
+    if profile.name in _AIRCRAFT_PROFILE_NAMES:
+        from src.mock_environment.aircraft_tools import AIRCRAFT_TOOL_REGISTRY
+
+        return AIRCRAFT_TOOL_REGISTRY
+    return TOOL_REGISTRY
+
 
 @dataclass(frozen=True)
 class PipelineContext:
@@ -18,7 +29,7 @@ class PipelineContext:
 
     @classmethod
     def from_profile(cls, profile: DomainProfile) -> PipelineContext:
-        return cls(profile=profile, tool_registry=TOOL_REGISTRY)
+        return cls(profile=profile, tool_registry=_select_tool_registry(profile))
 
     @classmethod
     def from_profile_path(cls, profile_path: str | Path) -> PipelineContext:

@@ -35,6 +35,71 @@ Geometry = GeoJSONPoint | GeoJSONLineString | GeoJSONPolygon
 
 
 # ---------------------------------------------------------------------------
+# Aircraft domain types
+# ---------------------------------------------------------------------------
+
+
+class AircraftTrackPoint(BaseModel):
+    timestamp: str
+    lat: float
+    lon: float
+    alt: float = 0.0
+    speed: float = 0.0
+    heading: float = 0.0
+    climbRate: float = 0.0
+
+
+class AircraftTrackIdentity(BaseModel):
+    callSign: str = ""
+    registration: str = ""
+    type: str = ""
+    aircraftModel: str = ""
+
+
+class AircraftGeoFeature(BaseModel):
+    type: str = "point"
+    geometry: dict[str, Any] = Field(default_factory=dict)
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+
+class Finding(BaseModel):
+    description: str = ""
+    severity: str = "info"
+    timeRange: dict[str, Any] = Field(default_factory=dict)
+    geoFeatures: list[AircraftGeoFeature] = Field(default_factory=list)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+class POI(BaseModel):
+    id: str
+    name: str
+    kind: str
+    point: dict[str, float] = Field(default_factory=dict)
+    distanceKm: float | None = None
+
+
+class AircraftLayerRecord(BaseModel):
+    feature_id: str
+    feature_type: str
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+
+class AircraftChartRecord(BaseModel):
+    chart_id: str
+    chart_type: str
+    title: str = ""
+
+
+class AircraftAgentStateSchema(BaseModel):
+    """Schema for the aircraft agent's visible state."""
+
+    time: str = ""
+    layers: dict[str, list[AircraftLayerRecord]] = Field(default_factory=dict)
+    charts: list[AircraftChartRecord] = Field(default_factory=list)
+    focused_layer: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Scenario / World objects
 # ---------------------------------------------------------------------------
 
@@ -156,6 +221,9 @@ class Difficulty(str, Enum):
     L3 = "L3"
     L4 = "L4"
     L5 = "L5"
+    Easy = "Easy"
+    Medium = "Medium"
+    Hard = "Hard"
 
 
 class BlueprintTarget(BaseModel):
@@ -181,6 +249,7 @@ class Blueprint(BaseModel):
 
 
 class AssertionType(str, Enum):
+    # Traffic map assertions
     artifact_exists = "artifact_exists"
     object_highlighted = "object_highlighted"
     objects_highlighted = "objects_highlighted"
@@ -190,6 +259,20 @@ class AssertionType(str, Enum):
     objects_inside_polygon_highlighted = "objects_inside_polygon_highlighted"
     no_tool_called = "no_tool_called"
     clarification_requested = "clarification_requested"
+    # Aircraft track assertions
+    track_info_returned = "track_info_returned"
+    behavior_detected = "behavior_detected"
+    no_behavior_detected = "no_behavior_detected"
+    spatial_finding_returned = "spatial_finding_returned"
+    map_drawn = "map_drawn"
+    chart_drawn = "chart_drawn"
+    distance_computed = "distance_computed"
+    poi_found = "poi_found"
+    related_found = "related_found"
+    aircraft_model_identified = "aircraft_model_identified"
+    flight_plan_returned = "flight_plan_returned"
+    reference_data_returned = "reference_data_returned"
+    scope_acknowledged = "scope_acknowledged"
 
 
 class FinalStateAssertion(BaseModel):

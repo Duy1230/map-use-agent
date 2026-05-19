@@ -1,0 +1,200 @@
+name: aircraft_track
+tool_catalog: ../tool_catalogs/aircraft_tools_v0_1.json
+schema_version: aircraft_v0.1
+
+object_types:
+  track:
+    collection: tracks
+    geometry: LineString
+    selection_slot: track
+    aliases: ["track", "quỹ đạo", "mục tiêu", "máy bay"]
+  airport:
+    collection: airports
+    geometry: Point
+    selection_slot: poi
+    aliases: ["airport", "sân bay"]
+  base:
+    collection: bases
+    geometry: Point
+    selection_slot: poi
+    aliases: ["base", "căn cứ"]
+  island:
+    collection: islands
+    geometry: Point
+    selection_slot: poi
+    aliases: ["island", "đảo"]
+  ship:
+    collection: ships
+    geometry: Point
+    selection_slot: poi
+    aliases: ["ship", "tàu"]
+  restricted_zone:
+    collection: restricted_zones
+    geometry: Polygon
+    selection_slot: zone
+    aliases: ["restricted zone", "vùng cấm", "vùng hạn chế"]
+  common_route:
+    collection: common_routes
+    geometry: LineString
+    selection_slot: route
+    aliases: ["route", "tuyến bay", "tuyến phổ biến"]
+
+selection_slots: ["track", "poi", "zone", "route"]
+layers: ["tracks", "airports", "bases", "islands", "ships", "restricted_zones", "common_routes"]
+
+time_ranges: {}
+
+task_families:
+  - name: routine_surveillance
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Track monitoring, status overview, shift briefing.
+  - name: target_identification
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Identify aircraft by callsign, registration, kinematic inference, or cross-check.
+  - name: threat_detection
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Detect restricted zone intrusion, approach to sensitive assets, threat assessment.
+  - name: behavioral_anomaly
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Detect hovering, circling, zigzag, U-turn, abnormal speed/altitude changes.
+  - name: decision_support
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Nearest POI, response time estimation, historical comparison, decision packages.
+  - name: coordination
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Companion aircraft, nearby ships, formation analysis, flight plan comparison.
+  - name: post_event_reporting
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Timeline summary, replay, shift-end reports, incident recap.
+  - name: spatial_flexible
+    difficulty: ["Easy", "Medium", "Hard"]
+    description: Distance queries, overflown areas, route matching, kinematic-to-model inference.
+  - name: adversarial
+    difficulty: ["Hard"]
+    description: Ambiguous reference, out-of-scope requests, missing track ID.
+
+difficulty_guidance:
+  Easy: Single tool call or simple lookup. Direct answer with minimal orchestration.
+  Medium: 2-3 tool calls, conditional logic, or comparison between data sources.
+  Hard: 4+ tool calls, multi-track aggregation, cross-reference, formatted output, or adversarial edge cases.
+
+prompt_rules:
+  - Do not invent track IDs outside the provided scenario.
+  - Every task must reference a valid trackId from the scenario unless it is an adversarial case.
+  - For adversarial cases, explicitly specify why the agent must ask for clarification or acknowledge scope limits.
+  - Generate Vietnamese user utterances for the aircraft domain unless a test explicitly asks otherwise.
+  - Use the voice of a Vietnamese military radar/VQ operator, concise and operational.
+  - Prefer terms like mục tiêu, track, quỹ đạo, tọa độ, độ cao, tốc độ, hướng bay, vùng hạn chế, xâm nhập, mất tín hiệu, vẽ lên bản đồ, báo cáo nhanh.
+  - Do not use English phrasing except technical tokens such as TrackID, callsign, registration, radar, VQ, or exact tool enum values.
+  - Avoid casual chatbot phrasing, jokes, and long explanations in user utterances.
+  - Tool arguments must use exact enum values from the tool catalog.
+  - GeoFeature output from analysis tools should be forwarded to mapDraw without modification.
+
+utterance_styles:
+  - vi_military_command
+  - vi_shift_briefing
+  - vi_situation_query
+  - vi_threat_check
+  - vi_post_event_report
+  - vi_short_command
+
+utterance_style_guidance:
+  vi_military_command: "Mệnh lệnh ngắn, trực tiếp, dùng động từ như kiểm tra, xác minh, báo cáo, vẽ."
+  vi_shift_briefing: "Giọng trực ban hoặc giao ca, trang trọng, có ngữ cảnh vận hành."
+  vi_situation_query: "Câu hỏi phân tích tình huống, nêu rõ mục tiêu/track và thông tin cần làm rõ."
+  vi_threat_check: "Giọng nghi vấn/cảnh báo, tập trung vùng hạn chế, xâm nhập, bất thường, mất tín hiệu."
+  vi_post_event_report: "Yêu cầu tổng hợp sau sự kiện, nhấn mạnh mốc thời gian, tuyến bay, điểm đáng chú ý."
+  vi_short_command: "Câu cực ngắn dưới 10 từ, vẫn giữ TrackID hoặc tham chiếu mục tiêu rõ ràng."
+
+assertions:
+  - track_info_returned
+  - behavior_detected
+  - no_behavior_detected
+  - spatial_finding_returned
+  - map_drawn
+  - chart_drawn
+  - distance_computed
+  - poi_found
+  - related_found
+  - aircraft_model_identified
+  - flight_plan_returned
+  - reference_data_returned
+  - clarification_requested
+  - scope_acknowledged
+  - no_tool_called
+
+allowed_extra_tools:
+  - getTrackInfo
+  - getReferenceData
+
+object_reference_args:
+  - trackId
+
+conditional_object_reference_args:
+  lookupAircraftModel:
+    value:
+      when:
+        by: kinematics
+      expected_type: track
+  lookupFlightPlan:
+    value:
+      when:
+        by: trackId
+      expected_type: track
+
+tool_type_constraints:
+  getTrackInfo:
+    trackId: track
+  getTrackPoints:
+    trackId: track
+  getKinematicStats:
+    trackId: track
+  analyzeSpatial:
+    trackId: track
+  detectBehavior:
+    trackId: track
+  findRelated:
+    trackId: track
+
+negative_strategies:
+  enabled:
+    - ambiguous_reference
+    - out_of_scope
+    - missing_track_id
+    - nonexistent_track
+  adversarial_patterns:
+    - Ambiguous reference without explicit track ID (e.g. "track lạ vừa rồi").
+    - Out-of-scope request such as generating military course of action.
+    - Request for prediction or forecast beyond available tools.
+    - Track ID that does not exist in the scenario.
+
+plan_templates:
+  routine_surveillance:
+    - tool: getTrackInfo
+      args:
+        trackId: "{{ target.object_id }}"
+        fields: ["identity", "latestPoint"]
+    - tool: mapDraw
+      args:
+        features:
+          - type: point
+            geometry: "$getTrackInfo.latestPoint"
+            properties:
+              label: "Latest position"
+        options:
+          autoFocus: true
+  target_identification:
+    - tool: getTrackInfo
+      args:
+        trackId: "{{ target.object_id }}"
+        fields: ["identity"]
+  behavioral_anomaly:
+    - tool: detectBehavior
+      args:
+        trackId: "{{ target.object_id }}"
+        pattern: "{{ constraints.pattern|hovering }}"
+    - tool: mapDraw
+      args:
+        features: "$detectBehavior.geoFeatures"
+        options:
+          autoFocus: true

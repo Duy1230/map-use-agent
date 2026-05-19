@@ -7,11 +7,14 @@ import logging
 import random
 
 from src.blueprint_generator.prompts import (
+    AIRCRAFT_BLUEPRINT_SYSTEM,
+    AIRCRAFT_BLUEPRINT_USER,
     BLUEPRINT_SYSTEM,
     BLUEPRINT_USER,
     DIFFICULTY_GUIDANCE,
     TASK_FAMILIES,
 )
+from src.pipeline.context import _AIRCRAFT_PROFILE_NAMES
 from src.domain.scenario import compact_scenario_objects
 from src.llm_backend.base import LLMBackend
 from src.pipeline.context import PipelineContext
@@ -52,8 +55,12 @@ def generate_blueprint(
     if tool_names is None:
         tool_names = context.tool_names if context else []
 
+    is_aircraft = context and context.profile.name in _AIRCRAFT_PROFILE_NAMES
     difficulty_guidance = context.profile.difficulty_guidance if context else DIFFICULTY_GUIDANCE
-    prompt = BLUEPRINT_USER.format(
+    system_prompt = AIRCRAFT_BLUEPRINT_SYSTEM if is_aircraft else BLUEPRINT_SYSTEM
+    user_template = AIRCRAFT_BLUEPRINT_USER if is_aircraft else BLUEPRINT_USER
+
+    prompt = user_template.format(
         scenario_json=_compact_scenario(scenario, context=context),
         tool_names=json.dumps(tool_names),
         task_family=task_family,
@@ -65,7 +72,7 @@ def generate_blueprint(
         )
 
     try:
-        return llm.generate_json(prompt, system=BLUEPRINT_SYSTEM, temperature=temperature)
+        return llm.generate_json(prompt, system=system_prompt, temperature=temperature)
     except ValueError:
         logger.error("Failed to generate blueprint for %s/%s", task_family, difficulty)
         return None

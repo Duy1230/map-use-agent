@@ -99,8 +99,49 @@ def _check_single(state: dict, assertion: dict, atype: str) -> bool:
         highlighted = state.get("highlighted_objects", [])
         return len(highlighted) > 0
 
-    if atype in ("clarification_requested", "no_tool_called"):
+    if atype in ("clarification_requested", "no_tool_called", "scope_acknowledged"):
         return True
+
+    if atype == "track_info_returned":
+        return any(
+            isinstance(result, dict) and result.get("trackId") and len(result) > 1
+            for result in _tool_results(state, "getTrackInfo")
+        )
+    if atype == "behavior_detected":
+        return any(_result_count(result) > 0 for result in _tool_results(state, "detectBehavior"))
+    if atype == "no_behavior_detected":
+        results = _tool_results(state, "detectBehavior")
+        return bool(results) and all(_result_count(result) == 0 for result in results)
+    if atype == "spatial_finding_returned":
+        return any(_result_count(result) > 0 for result in _tool_results(state, "analyzeSpatial"))
+    if atype == "map_drawn":
+        layers = state.get("layers", {})
+        return len(layers) > 0
+    if atype == "chart_drawn":
+        charts = state.get("charts", [])
+        return len(charts) > 0
+    if atype == "distance_computed":
+        return any(
+            isinstance(result, dict) and result.get("distanceKm", -1) >= 0
+            for result in _tool_results(state, "computeDistance")
+        )
+    if atype == "poi_found":
+        return any(_result_count(result) > 0 for result in _tool_results(state, "findNearestPOI"))
+    if atype == "related_found":
+        return any(_result_count(result) > 0 for result in _tool_results(state, "findRelated"))
+    if atype == "aircraft_model_identified":
+        return any(
+            isinstance(result, dict) and bool(result.get("candidates"))
+            for result in _tool_results(state, "lookupAircraftModel")
+        )
+    if atype == "flight_plan_returned":
+        return any(
+            isinstance(result, dict)
+            and any(result.get(key) for key in ("route", "origin", "destination"))
+            for result in _tool_results(state, "lookupFlightPlan")
+        )
+    if atype == "reference_data_returned":
+        return any(_result_count(result) > 0 for result in _tool_results(state, "getReferenceData"))
 
     logger.warning("Unknown assertion type: %s", atype)
     return True
@@ -117,3 +158,20 @@ def _has_artifact(
         if type_ok and src_ok:
             return True
     return False
+
+
+def _tool_results(state: dict, tool_name: str) -> list:
+    results = state.get("tool_results", {}).get(tool_name, [])
+    return results if isinstance(results, list) else []
+
+
+def _result_count(result: object) -> int:
+    if isinstance(result, list):
+        return len(result)
+    if isinstance(result, dict):
+        for key in ("findings", "results", "data"):
+            value = result.get(key)
+            if isinstance(value, list):
+                return len(value)
+        return 1 if result else 0
+    return 0

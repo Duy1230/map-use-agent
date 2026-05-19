@@ -13,9 +13,9 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from src.pipeline.config import PipelineConfig  # noqa: E402
+from src.pipeline.context import PipelineContext  # noqa: E402
 from src.pipeline.logging_utils import setup_logging  # noqa: E402
-from src.pipeline.runner import run_pipeline  # noqa: E402
-from src.world_generator.generator import generate_worlds  # noqa: E402
+from src.pipeline.runner import _generate_worlds_for_profile, run_pipeline  # noqa: E402
 
 app = typer.Typer(help="Map Agent synthetic data pipeline")
 
@@ -87,11 +87,10 @@ def main(
 
     if stage == "worlds":
         typer.echo(f"Generating {cfg.worlds.count} worlds...")
-        paths = generate_worlds(
-            cfg.worlds.count,
-            output_dir=cfg.scenarios_dir,
-            base_seed=cfg.worlds.base_seed,
-        )
+        context = PipelineContext.from_profile_path(cfg.profile)
+        scenarios_dir = Path(cfg.scenarios_dir)
+        _generate_worlds_for_profile(context, cfg, scenarios_dir)
+        paths = sorted(scenarios_dir.glob("*.json"))
         typer.echo(f"Generated {len(paths)} world files in {cfg.scenarios_dir}/")
         return
 

@@ -47,7 +47,11 @@ def check_execution(
         except ToolExecutionError as exc:
             errors.append(f"gold_trace[{i}] ({tool}): {exc}")
         except Exception as exc:
-            errors.append(f"gold_trace[{i}] ({tool}) unexpected error: {exc}")
+            err_type = type(exc).__name__
+            if "NotFound" in err_type or "ExecutionError" in err_type:
+                errors.append(f"gold_trace[{i}] ({tool}): {exc}")
+            else:
+                errors.append(f"gold_trace[{i}] ({tool}) unexpected error: {exc}")
 
     final_state = env.get_final_state() if not errors else None
     return (len(errors) == 0, errors, final_state)

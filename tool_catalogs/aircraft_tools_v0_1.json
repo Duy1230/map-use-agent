@@ -1,0 +1,502 @@
+{
+  "version": "aircraft_tools_v0.1",
+  "tools": [
+    {
+      "name": "getTrackInfo",
+      "description": "Return metadata of a track by requested fields. 'identity' includes callsign, registration, type (HKDD/transit/VIP/hostile). 'signalGaps' returns Finding[] for gaps > 30 min.",
+      "category": "data_access",
+      "parameters": [
+        {
+          "name": "trackId",
+          "type": "string",
+          "description": "The unique track identifier.",
+          "required": true
+        },
+        {
+          "name": "fields",
+          "type": "array",
+          "description": "Which fields to return.",
+          "required": true,
+          "items": {
+            "type": "string",
+            "enum": ["identity", "timespan", "startPoint", "endPoint", "latestPoint", "signalGaps", "all"]
+          }
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "trackId": {"type": "string"},
+          "identity": {"type": "object"},
+          "timespan": {"type": "object"},
+          "startPoint": {"type": "object"},
+          "endPoint": {"type": "object"},
+          "latestPoint": {"type": "object"},
+          "signalGaps": {"type": "array", "items": {"type": "object"}}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "getTrackPoints",
+      "description": "Return the raw radar point sequence for a track, optionally filtered by time range and downsampled.",
+      "category": "data_access",
+      "parameters": [
+        {
+          "name": "trackId",
+          "type": "string",
+          "description": "The unique track identifier.",
+          "required": true
+        },
+        {
+          "name": "timeRange",
+          "type": "object",
+          "description": "Optional time window with start/end ISO-8601 strings.",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "sampling",
+          "type": "string",
+          "description": "Sampling resolution.",
+          "required": false,
+          "default": "downsample-10s",
+          "enum": ["raw", "downsample-1s", "downsample-10s"]
+        }
+      ],
+      "return_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "lat": {"type": "number"},
+            "lon": {"type": "number"},
+            "alt": {"type": "number"},
+            "timestamp": {"type": "string"}
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "getKinematicStats",
+      "description": "Compute kinematic statistics for a track along one dimension: speed, altitude, heading, or climbRate. Returns mean/min/max, distribution, time series, and geoFeatures for map overlay.",
+      "category": "analysis",
+      "parameters": [
+        {
+          "name": "trackId",
+          "type": "string",
+          "description": "The unique track identifier.",
+          "required": true
+        },
+        {
+          "name": "dimension",
+          "type": "string",
+          "description": "The kinematic dimension to analyze.",
+          "required": true,
+          "enum": ["speed", "altitude", "heading", "climbRate"]
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "mean": {"type": "number"},
+          "min": {"type": "number"},
+          "max": {"type": "number"},
+          "atMinTime": {"type": "string"},
+          "atMaxTime": {"type": "string"},
+          "distribution": {
+            "type": "object",
+            "properties": {
+              "bins": {"type": "array", "items": {"type": "number"}},
+              "counts": {"type": "array", "items": {"type": "number"}}
+            }
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "t": {"type": "string"},
+                "v": {"type": "number"}
+              }
+            }
+          },
+          "geoFeatures": {"type": "array", "items": {"type": "object"}}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "analyzeSpatial",
+      "description": "Perform spatial analysis on a track. Each Finding includes description, timeRange, and geoFeatures ready for mapDraw.",
+      "category": "analysis",
+      "parameters": [
+        {
+          "name": "trackId",
+          "type": "string",
+          "description": "The unique track identifier.",
+          "required": true
+        },
+        {
+          "name": "aspect",
+          "type": "string",
+          "description": "The spatial aspect to analyze.",
+          "required": true,
+          "enum": ["overflownAreas", "restrictedZones", "commonRoutes", "notablePoints", "primaryHeading"]
+        }
+      ],
+      "return_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "severity": {"type": "string", "enum": ["info", "warn", "critical"]},
+            "timeRange": {"type": "object"},
+            "geoFeatures": {"type": "array", "items": {"type": "object"}},
+            "metrics": {"type": "object"}
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "detectBehavior",
+      "description": "Detect behavioral patterns in a track. Returns Finding[] with location, time, and severity for each detected event.",
+      "category": "analysis",
+      "parameters": [
+        {
+          "name": "trackId",
+          "type": "string",
+          "description": "The unique track identifier.",
+          "required": true
+        },
+        {
+          "name": "pattern",
+          "type": "string",
+          "description": "The behavioral pattern to detect.",
+          "required": true,
+          "enum": [
+            "abnormalAcceleration",
+            "speedThresholdExceeded",
+            "hovering",
+            "abnormalAltitudeChange",
+            "sustainedLowAltitude",
+            "suddenDirectionChange",
+            "circling",
+            "zigzag",
+            "uTurn"
+          ]
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "description": "Optional detection parameters: threshold (number), minDurationMin (number).",
+          "required": false,
+          "default": {}
+        }
+      ],
+      "return_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "severity": {"type": "string"},
+            "timeRange": {"type": "object"},
+            "geoFeatures": {"type": "array", "items": {"type": "object"}},
+            "metrics": {"type": "object"}
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "lookupAircraftModel",
+      "description": "Identify the aircraft model by callsign, registration, or kinematic inference. Returns ranked candidates with confidence scores.",
+      "category": "lookup",
+      "parameters": [
+        {
+          "name": "by",
+          "type": "string",
+          "description": "Lookup method.",
+          "required": true,
+          "enum": ["callsign", "registration", "kinematics"]
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Callsign, registration string, or trackId (when by='kinematics').",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "model": {"type": "string"},
+                "confidence": {"type": "number"}
+              }
+            }
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "lookupFlightPlan",
+      "description": "Retrieve the filed flight plan for a track by callsign or trackId.",
+      "category": "lookup",
+      "parameters": [
+        {
+          "name": "by",
+          "type": "string",
+          "description": "Lookup method.",
+          "required": true,
+          "enum": ["callsign", "trackId"]
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Callsign or trackId value.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "route": {"type": "array", "items": {"type": "object"}},
+          "origin": {"type": "string"},
+          "destination": {"type": "string"},
+          "etaSchedule": {"type": "object"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "findRelated",
+      "description": "Find entities related to a track: companion aircraft, nearby ships, or similar historical tracks.",
+      "category": "lookup",
+      "parameters": [
+        {
+          "name": "trackId",
+          "type": "string",
+          "description": "The unique track identifier.",
+          "required": true
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "description": "Type of related entity to find.",
+          "required": true,
+          "enum": ["companionAircraft", "nearbyShips", "similarHistoricalTracks"]
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "description": "Optional: radiusKm (number), topK (number), timeRange (object with start/end).",
+          "required": false,
+          "default": {}
+        }
+      ],
+      "return_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "similarity": {"type": "number"},
+            "geoFeatures": {"type": "array", "items": {"type": "object"}}
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "findNearestPOI",
+      "description": "Find the k nearest points of interest of a given type relative to a track position or arbitrary point.",
+      "category": "geo_utility",
+      "parameters": [
+        {
+          "name": "reference",
+          "type": "object",
+          "description": "Either {trackId, when: 'start'|'end'|'latest'|ISO timestamp} or {lat, lon}.",
+          "required": true
+        },
+        {
+          "name": "poiType",
+          "type": "string",
+          "description": "Type of POI to search for.",
+          "required": true,
+          "enum": ["airport", "base", "island", "ship"]
+        },
+        {
+          "name": "k",
+          "type": "number",
+          "description": "Number of nearest results to return.",
+          "required": false,
+          "default": 1
+        }
+      ],
+      "return_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "kind": {"type": "string"},
+            "point": {"type": "object"},
+            "distanceKm": {"type": "number"}
+          }
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "computeDistance",
+      "description": "Compute the great-circle distance and bearing between two points. Points can be track positions, POI names, or raw coordinates.",
+      "category": "geo_utility",
+      "parameters": [
+        {
+          "name": "from",
+          "type": "object",
+          "description": "Origin: {lat, lon} or {trackId, when} or {poiName}.",
+          "required": true
+        },
+        {
+          "name": "to",
+          "type": "object",
+          "description": "Destination: {lat, lon} or {trackId, when} or {poiName}.",
+          "required": true
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "distanceKm": {"type": "number"},
+          "bearing": {"type": "number"}
+        }
+      },
+      "side_effects": false
+    },
+    {
+      "name": "getReferenceData",
+      "description": "Retrieve reference/static data: airports, military bases, islands, restricted zones, common air routes, or aircraft model profiles.",
+      "category": "reference",
+      "parameters": [
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "Type of reference data.",
+          "required": true,
+          "enum": ["airports", "bases", "islands", "restrictedZones", "commonRoutes", "aircraftModelProfile"]
+        },
+        {
+          "name": "filter",
+          "type": "object",
+          "description": "Optional filter: area (bounding box) or name (string match).",
+          "required": false,
+          "default": {}
+        }
+      ],
+      "return_schema": {
+        "type": "array",
+        "items": {"type": "object"}
+      },
+      "side_effects": false
+    },
+    {
+      "name": "mapDraw",
+      "description": "Draw one or more GeoFeatures on the map. Accepts points, lines, polygons, heatmaps, and connections. Returns the assigned layer ID.",
+      "category": "visualization",
+      "parameters": [
+        {
+          "name": "features",
+          "type": "array",
+          "description": "Array of GeoFeature objects with type, geometry, and optional properties.",
+          "required": true
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "description": "Optional: layerId (string), autoFocus (boolean).",
+          "required": false,
+          "default": {}
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "layerId": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    },
+    {
+      "name": "mapControl",
+      "description": "Control the map view: focus on features, clear a layer, highlight a time range, or list active layers.",
+      "category": "visualization",
+      "parameters": [
+        {
+          "name": "action",
+          "type": "string",
+          "description": "The map control action to perform.",
+          "required": true,
+          "enum": ["focus", "clearLayer", "highlightTimeRange", "listLayers"]
+        },
+        {
+          "name": "args",
+          "type": "object",
+          "description": "Action-specific arguments.",
+          "required": false,
+          "default": {}
+        }
+      ],
+      "return_schema": {
+        "type": "object"
+      },
+      "side_effects": true
+    },
+    {
+      "name": "drawChart",
+      "description": "Render a chart: distribution histogram, radar chart, or time-series plot.",
+      "category": "visualization",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Chart type.",
+          "required": true,
+          "enum": ["distribution", "radar", "timeSeries"]
+        },
+        {
+          "name": "data",
+          "type": "object",
+          "description": "Chart data payload (bins/counts for distribution, categories/values for radar, series for timeSeries).",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Optional chart title.",
+          "required": false,
+          "default": ""
+        }
+      ],
+      "return_schema": {
+        "type": "object",
+        "properties": {
+          "chartId": {"type": "string"}
+        }
+      },
+      "side_effects": true
+    }
+  ]
+}

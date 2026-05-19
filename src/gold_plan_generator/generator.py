@@ -166,6 +166,108 @@ _DETERMINISTIC_PLANS: dict[str, callable] = {
 
 
 # ---------------------------------------------------------------------------
+# Aircraft deterministic plan templates
+# ---------------------------------------------------------------------------
+
+
+def _aircraft_plan_routine_surveillance(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    return [
+        {"tool": "getTrackInfo", "args": {"trackId": track_id, "fields": ["identity", "latestPoint"]}},
+        {
+            "tool": "mapDraw",
+            "args": {
+                "features": [
+                    {
+                        "type": "point",
+                        "geometry": "$getTrackInfo.latestPoint",
+                        "properties": {"label": "Latest position"},
+                    }
+                ],
+                "options": {"autoFocus": True},
+            },
+        },
+    ]
+
+
+def _aircraft_plan_target_identification(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    return [
+        {"tool": "getTrackInfo", "args": {"trackId": track_id, "fields": ["identity"]}},
+    ]
+
+
+def _aircraft_plan_threat_detection(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    return [
+        {"tool": "analyzeSpatial", "args": {"trackId": track_id, "aspect": "restrictedZones"}},
+        {"tool": "mapDraw", "args": {"features": "$analyzeSpatial.geoFeatures", "options": {"autoFocus": True}}},
+    ]
+
+
+def _aircraft_plan_behavioral_anomaly(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    pattern = bp.get("constraints", {}).get("pattern", "hovering")
+    return [
+        {"tool": "detectBehavior", "args": {"trackId": track_id, "pattern": pattern}},
+        {"tool": "mapDraw", "args": {"features": "$detectBehavior.geoFeatures", "options": {"autoFocus": True}}},
+    ]
+
+
+def _aircraft_plan_decision_support(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    poi_type = bp.get("constraints", {}).get("poiType", "base")
+    return [
+        {"tool": "findNearestPOI", "args": {"reference": {"trackId": track_id, "when": "latest"}, "poiType": poi_type, "k": 3}},
+        {"tool": "mapDraw", "args": {"features": "$findNearestPOI.geoFeatures", "options": {"autoFocus": True}}},
+    ]
+
+
+def _aircraft_plan_coordination(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    return [
+        {"tool": "findRelated", "args": {"trackId": track_id, "target": "companionAircraft"}},
+        {"tool": "mapDraw", "args": {"features": "$findRelated.geoFeatures", "options": {"autoFocus": True}}},
+    ]
+
+
+def _aircraft_plan_post_event_reporting(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    return [
+        {"tool": "getTrackInfo", "args": {"trackId": track_id, "fields": ["identity", "timespan", "startPoint", "endPoint", "signalGaps"]}},
+        {"tool": "analyzeSpatial", "args": {"trackId": track_id, "aspect": "notablePoints"}},
+    ]
+
+
+def _aircraft_plan_spatial_flexible(bp: dict, scenario: dict) -> list[dict]:
+    target = bp.get("target", {})
+    track_id = target.get("object_id")
+    aspect = bp.get("constraints", {}).get("aspect", "overflownAreas")
+    return [
+        {"tool": "analyzeSpatial", "args": {"trackId": track_id, "aspect": aspect}},
+    ]
+
+
+_AIRCRAFT_DETERMINISTIC_PLANS: dict[str, callable] = {
+    "routine_surveillance": _aircraft_plan_routine_surveillance,
+    "target_identification": _aircraft_plan_target_identification,
+    "threat_detection": _aircraft_plan_threat_detection,
+    "behavioral_anomaly": _aircraft_plan_behavioral_anomaly,
+    "decision_support": _aircraft_plan_decision_support,
+    "coordination": _aircraft_plan_coordination,
+    "post_event_reporting": _aircraft_plan_post_event_reporting,
+    "spatial_flexible": _aircraft_plan_spatial_flexible,
+}
+
+
+# ---------------------------------------------------------------------------
 # LLM fallback for non-standard task types
 # ---------------------------------------------------------------------------
 
@@ -220,7 +322,7 @@ def generate_gold_plan(
     if context and task_type in context.profile.plan_templates:
         return _plan_from_template(context.profile.plan_templates[task_type], blueprint)
 
-    planner = _DETERMINISTIC_PLANS.get(task_type)
+    planner = _DETERMINISTIC_PLANS.get(task_type) or _AIRCRAFT_DETERMINISTIC_PLANS.get(task_type)
 
     if planner is not None:
         return planner(blueprint, scenario)

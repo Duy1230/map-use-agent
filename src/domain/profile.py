@@ -90,9 +90,11 @@ class DomainProfile:
     plan_templates: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     prompt_rules: list[str] = field(default_factory=list)
     utterance_styles: list[str] = field(default_factory=list)
+    utterance_style_guidance: dict[str, str] = field(default_factory=dict)
     allowed_extra_tools: list[str] = field(default_factory=list)
     tool_type_constraints: dict[str, dict[str, str]] = field(default_factory=dict)
     object_reference_args: list[str] = field(default_factory=list)
+    conditional_object_reference_args: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def from_file(cls, path: str | Path) -> DomainProfile:
@@ -139,9 +141,13 @@ class DomainProfile:
             plan_templates=dict(data.get("plan_templates", {})),
             prompt_rules=list(data.get("prompt_rules", [])),
             utterance_styles=list(data.get("utterance_styles", [])),
+            utterance_style_guidance=dict(data.get("utterance_style_guidance", {})),
             allowed_extra_tools=list(data.get("allowed_extra_tools", [])),
             tool_type_constraints=dict(data.get("tool_type_constraints", {})),
             object_reference_args=list(data.get("object_reference_args", [])),
+            conditional_object_reference_args=dict(
+                data.get("conditional_object_reference_args", {})
+            ),
         )
 
     @property

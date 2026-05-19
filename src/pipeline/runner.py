@@ -27,6 +27,7 @@ from src.verification.human_review import export_review_queue, select_review_sam
 from src.verification.schema_validator import validate_schema
 from src.verification.semantic_verifier import verify_semantic
 from src.verification.static_checker import check_static
+from src.pipeline.context import _AIRCRAFT_PROFILE_NAMES
 from src.world_generator.generator import generate_worlds
 
 logger = logging.getLogger(__name__)
@@ -87,13 +88,7 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
     scenario_files = sorted(scenarios_dir.glob("*.json"))
     if not scenario_files:
         logger.info("Generating %d synthetic worlds...", cfg.worlds.count)
-        generate_worlds(
-            cfg.worlds.count,
-            output_dir=scenarios_dir,
-            base_seed=cfg.worlds.base_seed,
-            small_fraction=cfg.worlds.small_fraction,
-            medium_fraction=cfg.worlds.medium_fraction,
-        )
+        _generate_worlds_for_profile(context, cfg, scenarios_dir)
         scenario_files = sorted(scenarios_dir.glob("*.json"))
 
     scenarios = []
@@ -367,3 +362,27 @@ def _find_scenario(scenarios: list[dict], scenario_id: str) -> dict | None:
         if s["scenario_id"] == scenario_id:
             return s
     return None
+
+
+def _generate_worlds_for_profile(
+    context: PipelineContext, cfg: PipelineConfig, output_dir: Path
+) -> None:
+    """Dispatch world generation to the correct generator based on profile."""
+    if context.profile.name in _AIRCRAFT_PROFILE_NAMES:
+        from src.world_generator.aircraft_generator import generate_aircraft_worlds
+
+        generate_aircraft_worlds(
+            cfg.worlds.count,
+            output_dir=output_dir,
+            base_seed=cfg.worlds.base_seed,
+            small_fraction=cfg.worlds.small_fraction,
+            medium_fraction=cfg.worlds.medium_fraction,
+        )
+    else:
+        generate_worlds(
+            cfg.worlds.count,
+            output_dir=output_dir,
+            base_seed=cfg.worlds.base_seed,
+            small_fraction=cfg.worlds.small_fraction,
+            medium_fraction=cfg.worlds.medium_fraction,
+        )

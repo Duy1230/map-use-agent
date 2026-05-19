@@ -155,6 +155,76 @@ DETERMINISTIC_MUTATORS = [
 
 
 # ---------------------------------------------------------------------------
+# Aircraft-specific mutation strategies
+# ---------------------------------------------------------------------------
+
+
+def _mutate_ambiguous_reference(
+    blueprint: dict,
+    scenario: dict | None = None,
+    context: PipelineContext | None = None,
+) -> dict | None:
+    """Create a case where no explicit track ID is provided."""
+    target = blueprint.get("target", {})
+    if not target.get("object_id"):
+        return None
+
+    neg = copy.deepcopy(blueprint)
+    neg["negative_case"] = True
+    neg["should_ask_clarification"] = True
+    neg["difficulty"] = "Hard"
+    neg["target"]["object_id"] = None
+    neg["target"]["reference_mode"] = "ambiguous"
+    neg["expected_final_state"] = [{"type": "clarification_requested"}]
+    neg["_negative_type"] = "ambiguous_reference"
+    return neg
+
+
+def _mutate_out_of_scope(
+    blueprint: dict,
+    scenario: dict | None = None,
+    context: PipelineContext | None = None,
+) -> dict | None:
+    """Create a request outside the agent's analysis scope (e.g. military COA)."""
+    neg = copy.deepcopy(blueprint)
+    neg["negative_case"] = True
+    neg["should_ask_clarification"] = False
+    neg["difficulty"] = "Hard"
+    neg["task_type"] = "adversarial"
+    neg["expected_final_state"] = [{"type": "scope_acknowledged"}]
+    neg["_negative_type"] = "out_of_scope"
+    neg["_user_hint"] = "User requests military course of action — agent should acknowledge scope limits and provide supporting data only."
+    return neg
+
+
+def _mutate_nonexistent_track(
+    blueprint: dict,
+    scenario: dict | None = None,
+    context: PipelineContext | None = None,
+) -> dict | None:
+    """Replace the track ID with one that does not exist."""
+    target = blueprint.get("target", {})
+    if not target.get("object_id"):
+        return None
+
+    neg = copy.deepcopy(blueprint)
+    neg["negative_case"] = True
+    neg["should_ask_clarification"] = True
+    neg["difficulty"] = "Hard"
+    neg["target"]["object_id"] = "T-9999"
+    neg["expected_final_state"] = [{"type": "clarification_requested"}]
+    neg["_negative_type"] = "nonexistent_track"
+    return neg
+
+
+AIRCRAFT_DETERMINISTIC_MUTATORS = [
+    _mutate_ambiguous_reference,
+    _mutate_out_of_scope,
+    _mutate_nonexistent_track,
+]
+
+
+# ---------------------------------------------------------------------------
 # LLM-generated adversarial cases
 # ---------------------------------------------------------------------------
 
@@ -180,6 +250,27 @@ Return a JSON blueprint with:
   should_ask_clarification: true, expected_final_state,
   initial_state, _negative_type, user_hint (short description of the adversarial pattern)"""
 
+_AIRCRAFT_ADVERSARIAL_SYSTEM = """\
+You are generating adversarial/negative test cases for an aircraft track analysis agent.
+The agent helps military radar operators analyze flight tracks using 14 tools.
+
+Generate a single negative-case blueprint. Return JSON only."""
+
+_AIRCRAFT_ADVERSARIAL_USER = """\
+Scenario ID: {scenario_id}
+Available track IDs: {object_ids}
+
+Generate one of these adversarial patterns:
+- Ambiguous reference: user says "track lạ vừa rồi" without a specific Track ID
+- Out-of-scope request: user asks to generate a military course of action (COA)
+- Prediction request: user asks to predict future track position (no tool exists for this)
+- Non-existent track: user references a track ID not in the scenario
+
+Return a JSON blueprint with:
+  task_type (adversarial), difficulty (Hard), target, negative_case: true,
+  should_ask_clarification: true, expected_final_state,
+  _negative_type, user_hint"""
+
 
 def generate_llm_adversarial(
     llm: LLMBackend,
@@ -188,10 +279,16 @@ def generate_llm_adversarial(
     context: PipelineContext | None = None,
 ) -> dict | None:
     """Use the LLM to generate one adversarial blueprint."""
+    from src.pipeline.context import _AIRCRAFT_PROFILE_NAMES
+
+    is_aircraft = context and context.profile.name in _AIRCRAFT_PROFILE_NAMES
+
     object_ids = [
         obj["id"] for obj in iter_scenario_objects(scenario, context.profile if context else None)
     ]
-    prompt = _ADVERSARIAL_USER.format(
+    system = _AIRCRAFT_ADVERSARIAL_SYSTEM if is_aircraft else _ADVERSARIAL_SYSTEM
+    user_template = _AIRCRAFT_ADVERSARIAL_USER if is_aircraft else _ADVERSARIAL_USER
+    prompt = user_template.format(
         scenario_id=scenario["scenario_id"],
         object_ids=json.dumps(object_ids[:15]),
     )
@@ -200,7 +297,7 @@ def generate_llm_adversarial(
             f"- {pattern}" for pattern in context.profile.adversarial_patterns
         )
     try:
-        return llm.generate_json(prompt, system=_ADVERSARIAL_SYSTEM, temperature=0.9)
+        return llm.generate_json(prompt, system=system, temperature=0.9)
     except ValueError:
         logger.error("LLM adversarial generation failed")
         return None
@@ -224,13 +321,17 @@ def generate_negative_cases(
 
     Returns a list of negative-case blueprints.
     """
+    from src.pipeline.context import _AIRCRAFT_PROFILE_NAMES
+
     negatives: list[dict] = []
     enabled = set(context.profile.enabled_negative_strategies) if context else None
+    is_aircraft = context and context.profile.name in _AIRCRAFT_PROFILE_NAMES
+    mutators = AIRCRAFT_DETERMINISTIC_MUTATORS if is_aircraft else DETERMINISTIC_MUTATORS
 
     for bp in blueprints:
         if bp.get("negative_case"):
             continue
-        for mutator in DETERMINISTIC_MUTATORS:
+        for mutator in mutators:
             strategy = _strategy_name(mutator)
             if enabled is not None and strategy not in enabled:
                 continue
