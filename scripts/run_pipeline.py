@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """CLI entry-point for the synthetic data generation pipeline."""
 
-import logging
 import sys
 from pathlib import Path
 from typing import Optional
@@ -14,15 +13,11 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from src.pipeline.config import PipelineConfig  # noqa: E402
+from src.pipeline.logging_utils import setup_logging  # noqa: E402
 from src.pipeline.runner import run_pipeline  # noqa: E402
 from src.world_generator.generator import generate_worlds  # noqa: E402
 
 app = typer.Typer(help="Map Agent synthetic data pipeline")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)-7s %(name)s  %(message)s",
-)
 
 
 @app.command()
@@ -47,6 +42,13 @@ def main(
         None, "--output-dir", "-o", help="Output directory for datasets"
     ),
     profile: Optional[str] = typer.Option(None, "--profile", help="Domain profile YAML override"),
+    resume: Optional[bool] = typer.Option(None, "--resume/--no-resume", help="Resume checkpointed runs"),
+    reset_checkpoint: bool = typer.Option(
+        False, "--reset-checkpoint", help="Delete checkpoint state before running"
+    ),
+    checkpoint_dir: Optional[str] = typer.Option(None, "--checkpoint-dir", help="Checkpoint directory"),
+    log_level: Optional[str] = typer.Option(None, "--log-level", help="Logging level"),
+    log_file: Optional[str] = typer.Option(None, "--log-file", help="Optional log file path"),
 ) -> None:
     """Run the synthetic data generation pipeline."""
     cfg_path = Path(config)
@@ -70,6 +72,18 @@ def main(
         cfg.datasets_dir = output_dir
     if profile:
         cfg.profile = profile
+    if resume is not None:
+        cfg.runtime.resume = resume
+    if reset_checkpoint:
+        cfg.runtime.reset_checkpoint = True
+    if checkpoint_dir:
+        cfg.runtime.checkpoint_dir = checkpoint_dir
+    if log_level:
+        cfg.runtime.log_level = log_level
+    if log_file:
+        cfg.runtime.log_file = log_file
+
+    setup_logging(cfg.runtime.log_level, cfg.runtime.log_file)
 
     if stage == "worlds":
         typer.echo(f"Generating {cfg.worlds.count} worlds...")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import hashlib
 import uuid
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from src.dedup.dedup import deduplicate
 from src.export.exporter import export_dataset
 from src.gold_plan_generator.generator import build_expected, generate_gold_plan
 from src.llm_backend.config import create_backend
+from src.pipeline.checkpoint import CheckpointManager
 from src.pipeline.context import PipelineContext
 from src.negative_generator.generator import generate_negative_cases
 from src.pipeline.config import PipelineConfig
@@ -56,6 +58,13 @@ class PipelineMetrics:
 def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
     """Execute the full synthetic data generation pipeline."""
     context = PipelineContext.from_profile_path(cfg.profile)
+    checkpoint = CheckpointManager(
+        cfg.runtime.checkpoint_dir,
+        fingerprint=_pipeline_fingerprint(cfg, context),
+        resume=cfg.runtime.resume,
+        reset=cfg.runtime.reset_checkpoint,
+    )
+    checkpoint.initialize()
     missing_handlers = context.validate_tool_registry()
     if missing_handlers:
         logger.warning("Tool catalog has no executable handlers for: %s", missing_handlers)
@@ -65,6 +74,11 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
         base_url=cfg.llm.base_url,
         model=cfg.llm.model,
         api_key=cfg.llm.api_key,
+        timeout=cfg.llm.timeout,
+        max_retries=cfg.llm.max_retries,
+        retry_backoff_seconds=cfg.llm.retry_backoff_seconds,
+        retry_backoff_max_seconds=cfg.llm.retry_backoff_max_seconds,
+        reconnect_on_failure=cfg.llm.reconnect_on_failure,
     )
     metrics = PipelineMetrics()
 
@@ -88,11 +102,19 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
     logger.info("Loaded %d scenarios", len(scenarios))
 
     # --- Stage 2-5: Generate per scenario ---------------------------------
-    all_candidates: list[dict] = []
+    all_candidates: list[dict] = checkpoint.load_candidates()
+    if all_candidates:
+        logger.info("Loaded %d checkpointed candidates", len(all_candidates))
 
     for scenario in tqdm(scenarios, desc="Scenarios"):
         sid = scenario["scenario_id"]
-        rng = random.Random(hash(sid))
+        if checkpoint.should_skip_scenario(sid):
+            logger.info("Skipping completed scenario from checkpoint: %s", sid)
+            continue
+        seed = int(hashlib.sha256(sid.encode("utf-8")).hexdigest()[:16], 16)
+        rng = random.Random(seed)
+        scenario_candidates: list[dict] = []
+        logger.info("Generating candidates for scenario %s", sid)
 
         # 2. Blueprints
         blueprints = generate_blueprints_for_scenario(
@@ -136,7 +158,20 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
 
             for utt in utterances:
                 sample = _assemble_sample(bp, scenario, utt, context=context)
-                all_candidates.append(sample)
+                scenario_candidates.append(sample)
+
+        all_candidates.extend(scenario_candidates)
+        if cfg.runtime.checkpoint_every_scenario:
+            checkpoint.append_candidates(sid, scenario_candidates)
+            checkpoint.mark_scenario_completed(
+                sid,
+                metrics={"candidates": len(all_candidates)},
+            )
+            logger.info(
+                "Checkpointed scenario %s with %d candidates",
+                sid,
+                len(scenario_candidates),
+            )
 
     metrics.candidates = len(all_candidates)
     logger.info("Total candidates: %d", metrics.candidates)
@@ -195,6 +230,7 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
         sample["generation_metadata"]["verified_by_execution"] = True
         sample["generation_metadata"]["verified_by_llm"] = cfg.verification.run_semantic_verifier
         verified.append(sample)
+        checkpoint.append_verified([sample])
 
     # --- Stage 7: Dedup ---------------------------------------------------
     deduped = deduplicate(verified, context=context)
@@ -218,8 +254,34 @@ def run_pipeline(cfg: PipelineConfig) -> dict[str, Path]:
     metrics.print_report()
     metrics_path = reports_dir / "pipeline_metrics.json"
     metrics_path.write_text(json.dumps(metrics.report(), indent=2), encoding="utf-8")
+    checkpoint.save_metrics(metrics.report())
 
     return paths
+
+
+def _pipeline_fingerprint(cfg: PipelineConfig, context: PipelineContext) -> str:
+    profile_path = Path(cfg.profile)
+    profile_text = profile_path.read_text(encoding="utf-8") if profile_path.exists() else ""
+    catalog_path = context.profile.tool_catalog.path
+    catalog_text = catalog_path.read_text(encoding="utf-8") if catalog_path.exists() else ""
+    payload = {
+        "profile": str(profile_path),
+        "profile_text": profile_text,
+        "tool_catalog": str(catalog_path),
+        "tool_catalog_text": catalog_text,
+        "llm": {
+            "backend": cfg.llm.backend,
+            "base_url": cfg.llm.base_url,
+            "model": cfg.llm.model,
+        },
+        "worlds": cfg.worlds.__dict__,
+        "generation": cfg.generation.__dict__,
+        "verification": cfg.verification.__dict__,
+        "scenarios_dir": cfg.scenarios_dir,
+        "schema_version": cfg.schema_version,
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _assemble_sample(

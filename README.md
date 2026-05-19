@@ -76,6 +76,10 @@ llm:
   base_url: "http://localhost:8000/v1"
   model: "meta-llama/Llama-3.1-70B-Instruct"
   api_key: "EMPTY"
+  max_retries: 3                          # retry transient LLM failures
+  retry_backoff_seconds: 1.0
+  retry_backoff_max_seconds: 30.0
+  reconnect_on_failure: true              # recreate llama.cpp HTTP client on retry
 
 worlds:
   count: 100          # number of synthetic map scenarios
@@ -100,6 +104,13 @@ verification:
 
 profile: "profiles/traffic_map.yaml"     # domain vocabulary and pipeline wiring
 schema_version: "legacy"                 # legacy | flexible
+
+runtime:
+  log_level: "INFO"
+  log_file: null
+  checkpoint_dir: "reports/checkpoints"
+  resume: true
+  reset_checkpoint: false
 ```
 
 **Environment variable overrides** (take precedence over the config file
@@ -176,6 +187,11 @@ Options:
   -s, --stage TEXT           Run a single stage: worlds | full
   -o, --output-dir TEXT      Output directory for datasets
       --profile TEXT         Domain profile YAML override
+      --resume / --no-resume Resume checkpointed runs
+      --reset-checkpoint     Delete checkpoint state before running
+      --checkpoint-dir TEXT  Checkpoint directory
+      --log-level TEXT       Logging level
+      --log-file TEXT        Optional log file path
 ```
 
 ---
@@ -239,6 +255,29 @@ Verification Pipeline            (6 gates — see below)
 Deduplication + Difficulty Label
         |
 Final Dataset Export (JSONL)
+```
+
+### Checkpoints and resume
+
+Long runs write scenario-level checkpoints under `reports/checkpoints/` by
+default. If a run is interrupted, rerun the same command and completed scenarios
+will be skipped. The checkpoint stores a config/profile/tool-catalog fingerprint;
+if those inputs change, reset the checkpoint before resuming:
+
+```bash
+python scripts/run_pipeline.py --reset-checkpoint
+```
+
+To disable resume:
+
+```bash
+python scripts/run_pipeline.py --no-resume
+```
+
+To write logs to a file:
+
+```bash
+python scripts/run_pipeline.py --log-file reports/pipeline.log --log-level DEBUG
 ```
 
 ### Verification gates

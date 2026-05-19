@@ -19,6 +19,10 @@ class VLLMBackend(LLMBackend):
         *,
         api_key: str = "EMPTY",
         timeout: float = 120.0,
+        max_retries: int = 3,
+        retry_backoff_seconds: float = 1.0,
+        retry_backoff_max_seconds: float = 30.0,
+        reconnect_on_failure: bool = True,
     ):
         self.model = model
         self._client = OpenAI(

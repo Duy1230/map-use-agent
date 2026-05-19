@@ -7,6 +7,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+COPY README.md MANUAL.md ./
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY pyproject.toml .
@@ -14,6 +16,7 @@ COPY src/ src/
 COPY scripts/ scripts/
 COPY tool_catalogs/ tool_catalogs/
 COPY schemas/ schemas/
+COPY profiles/ profiles/
 COPY pipeline_config.yaml .
 
 ENV PYTHONPATH=/app

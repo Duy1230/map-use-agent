@@ -15,6 +15,10 @@ class LLMConfig:
     model: str | None = None
     api_key: str | None = None
     timeout: float = 120.0
+    max_retries: int = 3
+    retry_backoff_seconds: float = 1.0
+    retry_backoff_max_seconds: float = 30.0
+    reconnect_on_failure: bool = True
 
 
 @dataclass
@@ -59,12 +63,23 @@ class VerificationConfig:
 
 
 @dataclass
+class RuntimeConfig:
+    log_level: str = "INFO"
+    log_file: str | None = None
+    checkpoint_dir: str = "reports/checkpoints"
+    resume: bool = True
+    reset_checkpoint: bool = False
+    checkpoint_every_scenario: bool = True
+
+
+@dataclass
 class PipelineConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     worlds: WorldConfig = field(default_factory=WorldConfig)
     generation: GenerationConfig = field(default_factory=GenerationConfig)
     targets: TargetDistribution = field(default_factory=TargetDistribution)
     verification: VerificationConfig = field(default_factory=VerificationConfig)
+    runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
 
     scenarios_dir: str = "scenarios"
     datasets_dir: str = "datasets"
@@ -89,6 +104,8 @@ class PipelineConfig:
             cfg.targets = TargetDistribution(**data["targets"])
         if "verification" in data:
             cfg.verification = VerificationConfig(**data["verification"])
+        if "runtime" in data:
+            cfg.runtime = RuntimeConfig(**data["runtime"])
         for key in (
             "scenarios_dir",
             "datasets_dir",

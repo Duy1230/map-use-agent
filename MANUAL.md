@@ -88,6 +88,10 @@ llm:
   base_url: "http://localhost:8000/v1"
   model: "meta-llama/Llama-3.1-70B-Instruct"
   api_key: "EMPTY"
+  max_retries: 3
+  retry_backoff_seconds: 1.0
+  retry_backoff_max_seconds: 30.0
+  reconnect_on_failure: true
 
 worlds:
   count: 100
@@ -107,6 +111,14 @@ datasets_dir: "datasets"
 reports_dir: "reports"
 profile: "profiles/traffic_map.yaml"
 schema_version: "legacy"
+
+runtime:
+  log_level: "INFO"
+  log_file: null
+  checkpoint_dir: "reports/checkpoints"
+  resume: true
+  reset_checkpoint: false
+  checkpoint_every_scenario: true
 ```
 
 CLI flags override the config file for common options:
@@ -566,6 +578,60 @@ Check `reports/pipeline_metrics.json`. Low pass rates usually point to:
 
 Temporarily disabling `run_semantic_verifier` can help isolate deterministic
 pipeline issues from LLM semantic-review issues.
+
+## 17. Checkpoints, Resume, And Reconnect
+
+Long full-pipeline runs are resumable. By default, the runner writes
+scenario-level checkpoints to:
+
+```text
+reports/checkpoints/
+```
+
+Checkpoint files:
+
+| File | Description |
+|---|---|
+| `run_state.json` | Fingerprint, completed scenarios, metrics snapshot |
+| `candidates.jsonl` | Generated candidates saved after each completed scenario |
+| `verified.jsonl` | Verified samples appended during verification |
+
+If the process stops after scenario 20, rerun the same command and scenarios
+1-20 will be skipped. The runner checks a fingerprint built from the config,
+profile, and tool catalog. If those inputs changed, resume is rejected so old
+and new candidates are not mixed.
+
+Useful flags:
+
+```bash
+python scripts/run_pipeline.py --no-resume
+python scripts/run_pipeline.py --reset-checkpoint
+python scripts/run_pipeline.py --checkpoint-dir reports/checkpoints_experiment
+```
+
+Logging flags:
+
+```bash
+python scripts/run_pipeline.py --log-level DEBUG
+python scripts/run_pipeline.py --log-file reports/pipeline.log
+```
+
+For llama.cpp, transient server disconnects are retried automatically. The
+backend catches connection, read, timeout, protocol, and transient 5xx failures,
+then recreates the HTTP client before retrying when `reconnect_on_failure` is
+enabled.
+
+Configure retry behavior:
+
+```yaml
+llm:
+  backend: "llamacpp"
+  base_url: "http://localhost:8080"
+  max_retries: 5
+  retry_backoff_seconds: 1.0
+  retry_backoff_max_seconds: 30.0
+  reconnect_on_failure: true
+```
 
 ## 16. Best Practices
 
